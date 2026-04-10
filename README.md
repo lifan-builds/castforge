@@ -4,8 +4,6 @@ Open-source framework for automated podcast pipelines.
 
 CastForge helps you build repeatable source-to-podcast workflows: extract content, shape it into episode materials, generate audio, publish artifacts, and run the whole thing on a schedule.
 
-It is built for teams who want to open-source the automation behind a podcast without mixing that infrastructure with the show's branding, feed identity, and published assets.
-
 ## Why CastForge
 
 Most podcast automation code is reusable.
@@ -13,93 +11,121 @@ Most podcast editorial logic is not.
 
 CastForge separates those concerns:
 
-- the framework repo owns orchestration, scheduling, runner automation, and shared integrations
-- each show repo owns its source adapters, prompts, branding, RSS identity, and published files
+- `CastForge` provides reusable pipeline stages, LLM integrations, audio tooling, and export helpers
+- each show repo keeps its own source adapters, prompts, branding, scheduling, RSS identity, and published assets
 
-This keeps infrastructure reusable while letting each podcast stay opinionated.
+This keeps the framework generic while letting each podcast stay opinionated.
 
-## What CastForge Handles
+## How It Works
 
-- scheduled and manual podcast runs
-- multi-stage pipelines such as `extract -> select -> brief -> export -> audio -> publish -> validate`
-- retry logic and idempotent job execution
-- self-hosted runner workflows
-- run manifests and artifact contracts
-- shared integrations for LLMs, audio tools, and publishing helpers
+CastForge is a Python package that your podcast repo depends on.
 
-## What Stays In A Show Repo
+Your show repo owns:
 
-A show repo should keep the parts that define the podcast itself:
+- its GitHub Actions workflow and cron schedule
+- its secrets and runner configuration
+- its source extraction logic
+- its prompts and editorial templates
+- its published feed, episodes, and assets
 
-- source-specific extraction logic
-- selection rules
-- prompts and editorial templates
-- branding and metadata
-- RSS/feed identity
-- public assets and published episode files
+CastForge provides:
 
-## Repository Model
+- reusable pipeline orchestration
+- LLM briefing helpers (Gemini)
+- audio generation integration (NotebookLM)
+- Markdown export utilities
+- a hooks-based pipeline model so each show can plug in its own logic
 
-A typical setup uses two repositories:
+## Quick Start
 
-1. `castforge`
-   The reusable framework.
-2. `my-podcast`
-   The show repo built on top of CastForge.
+In your podcast repository:
 
-CastForge runs the automation. The show repo remains the public home of the podcast.
+```bash
+pip install git+https://github.com/lifan-builds/castforge.git
+```
 
-## Example
+Then write a thin `run_pipeline.py` that wires your show-specific hooks into the CastForge pipeline:
 
-CastForge is being extracted from the production workflow behind `nitan-podcast`, a weekly Chinese podcast generated from hot USCardForum discussions.
+```python
+from castforge.pipeline import PipelineHooks, main as castforge_main
+from my_show.extractor import extract, fetch_details, list_tools, select, to_markdown
+from my_show.publisher import write_post
+from my_show.rss import generate_feed
+from my_show.config import EPISODE_PREFIX, episode_filename, episode_url
 
-In that setup:
+def main(argv=None):
+    hooks = PipelineHooks(
+        extract_weekly_key_info=extract,
+        fetch_thread_details=fetch_details,
+        list_mcp_tools=list_tools,
+        select_threads=select,
+        threads_to_source_markdown=to_markdown,
+        write_forum_post=write_post,
+        generate_rss_feed=generate_feed,
+        episode_file_prefix=EPISODE_PREFIX,
+        week_episode_filename=episode_filename,
+        week_episode_url=episode_url,
+    )
+    return castforge_main(argv, hooks=hooks)
 
-- `castforge` will run the schedule and orchestration
-- `nitan-podcast` will continue to own the feed, episode assets, prompts, and public URLs
+if __name__ == "__main__":
+    raise SystemExit(main())
+```
 
-## Core Concepts
+## Pipeline Stages
 
 CastForge organizes work into stages:
 
-- `extract`
-- `select`
-- `brief`
-- `export`
-- `audio`
-- `publish`
-- `validate`
+- `extract` — fetch source content via your adapter
+- `select` — choose items for the episode
+- `brief` — optionally rewrite/shape material with an LLM
+- `export` — produce a source document for the audio engine
+- `audio` — generate podcast audio (NotebookLM integration included)
+- `publish` — create downstream outputs (RSS, forum posts, release artifacts)
+- `validate` — run post-publish checks
 
-Each show can customize the parts it needs while reusing the same execution model.
+Each stage is customizable through the `PipelineHooks` interface.
 
 ## Instance Contract
 
-Each show repo exposes a small configuration surface that CastForge can read. See `docs/instance-contract.md` and `examples/podcast.yaml`.
+Each show repo can expose a `podcast.yaml` describing its identity and public URLs. See `examples/podcast.yaml` for the format.
 
-The first production instance keeps a strict public compatibility contract:
+The key rule: subscriber-facing values (feed URL, episode URLs, GUIDs) must remain stable across automation changes.
 
-- feed URL must remain stable
-- episode GUIDs must remain stable
-- enclosure URLs must remain stable
+## Example Workflow
 
-That is the key to moving automation without breaking Apple Podcasts or Spotify subscribers.
+See `examples/weekly-podcast.yml` for a GitHub Actions workflow template. Copy it into your show repo and adjust the schedule, runner labels, and pipeline flags.
 
-## Initial Roadmap
+The key step is installing CastForge as a dependency:
 
-- define the instance contract
-- extract generic pipeline stages
-- move workflow orchestration into this repo
-- keep the show repo as the publishing surface
-- add a reference show implementation
+```yaml
+- run: $PY -m pip install -q git+https://github.com/lifan-builds/castforge.git
+```
+
+## Example
+
+CastForge powers [`nitan-podcast`](https://github.com/lifan-builds/nitan-podcast), a weekly Chinese podcast generated from hot USCardForum discussions.
+
+In that setup:
+
+- `nitan-podcast` owns its workflow, schedule, feed, episodes, and public URLs
+- `nitan-podcast` installs `castforge` as a dependency and delegates pipeline execution to it
 
 ## Design Principle
 
-**The framework should own execution.**
-**The show repo should own identity.**
+**The framework provides reusable execution.**
+**The show repo owns identity, scheduling, and publishing.**
 
 ## Status
 
-This repo is currently a scaffold for the extraction work. The first milestone is to move reusable automation here while preserving the existing public podcast endpoints in `nitan-podcast`.
+CastForge is being extracted from a working production podcast pipeline. The first public version includes:
+
+- reusable pipeline stages with a hooks interface
+- Gemini briefing integration
+- NotebookLM audio integration
+- Markdown export utilities
+- instance contract documentation
+- example workflow and configuration
 
 ## Contributing
 
@@ -107,7 +133,7 @@ Issues and PRs are welcome, especially for:
 
 - source adapters
 - publishing integrations
-- workflow improvements
+- new audio/LLM provider support
 - documentation for show authors
 - example show templates
 

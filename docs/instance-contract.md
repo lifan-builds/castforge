@@ -58,10 +58,10 @@ Those are not internal details. They are part of the show's public API.
 
 ## Execution Model
 
-The intended workflow is:
+Each show repo owns its own workflow and schedule. A typical GitHub Actions setup:
 
-1. CastForge checks out the show repo.
-2. CastForge reads `podcast.yaml`.
-3. CastForge executes the pipeline using the configured adapters and templates.
-4. CastForge writes updated artifacts back into the show repo.
-5. The show repo remains the public publishing surface.
+1. The show repo's workflow triggers on cron or manual dispatch.
+2. The workflow installs CastForge as a dependency.
+3. The workflow runs the show's `run_pipeline.py`, which wires show-specific hooks into the CastForge pipeline.
+4. CastForge executes the pipeline stages using those hooks.
+5. The workflow commits and pushes updated artifacts within the show repo.
