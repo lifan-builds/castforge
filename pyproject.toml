@@ -2,11 +2,39 @@
 name = "castforge"
 version = "0.1.0"
 description = "Open-source framework for automated podcast pipelines"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "CastForge contributors" }]
 requires-python = ">=3.10"
+keywords = ["podcast", "automation", "notebooklm", "rss", "gemini"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Multimedia :: Sound/Audio",
+]
 dependencies = [
   "anyio>=4",
   "python-dotenv>=1",
 ]
+
+[project.optional-dependencies]
+gemini = [
+  "google-genai>=1.69",
+]
+notebooklm = [
+  "notebooklm-py>=0.3",
+]
+
+[project.urls]
+Homepage = "https://github.com/lifan-builds/castforge"
+Repository = "https://github.com/lifan-builds/castforge"
+Documentation = "https://github.com/lifan-builds/castforge#readme"
+Issues = "https://github.com/lifan-builds/castforge/issues"
 
 [build-system]
 requires = ["setuptools>=68"]

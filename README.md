@@ -44,6 +44,23 @@ In your podcast repository:
 pip install git+https://github.com/lifan-builds/castforge.git
 ```
 
+### Optional extras
+
+CastForge core depends only on `anyio` and `python-dotenv`. Integrations are optional:
+
+```bash
+# Gemini briefing (`castforge.briefing`)
+pip install "castforge[gemini] @ git+https://github.com/lifan-builds/castforge.git"
+
+# NotebookLM audio (`castforge.notebooklm_audio`)
+pip install "castforge[notebooklm] @ git+https://github.com/lifan-builds/castforge.git"
+
+# Both
+pip install "castforge[gemini,notebooklm] @ git+https://github.com/lifan-builds/castforge.git"
+```
+
+After CastForge is published to PyPI, replace the git URL with `castforge` and the same extras.
+
 Then write a thin `run_pipeline.py` that wires your show-specific hooks into the CastForge pipeline:
 
 ```python
@@ -137,6 +154,14 @@ Issues and PRs are welcome, especially for:
 - documentation for show authors
 - example show templates
 
+## Publishing to PyPI (maintainers)
+
+1. Bump `version` in `pyproject.toml`.
+2. Build: `python -m pip install build twine && python -m build`.
+3. Upload: `python -m twine upload dist/*` (requires a [PyPI](https://pypi.org) API token).
+
+Until the package is on PyPI, show repos can keep installing from git as in `examples/weekly-podcast.yml`.
+
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).
