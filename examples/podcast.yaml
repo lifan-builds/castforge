@@ -1,0 +1,42 @@
+apiVersion: castforge.dev/v1alpha1
+kind: PodcastInstance
+
+metadata:
+  slug: example-podcast
+  displayName: Example Podcast
+  language: en
+  description: Example show repository contract for CastForge.
+
+publicContract:
+  siteUrl: https://example.com/podcast/
+  feedUrl: https://example.com/podcast/feed.xml
+  audioBaseUrl: https://example.com/podcast/episodes
+  coverArtUrl: https://example.com/podcast/assets/cover.png
+  episodeFilePrefix: weekly_episode
+  episodeGuidPrefix: example-podcast
+  publishPaths:
+    feed: docs/feed.xml
+    audioDir: docs/episodes
+  invariants:
+    - Keep the public feed URL stable once subscribers exist.
+    - Keep historical episode URLs stable.
+    - Keep GUIDs stable across automation changes.
+
+source:
+  adapter: custom-source
+  inputType: structured_items
+  configuration:
+    commandEnv: SOURCE_COMMAND
+    argsEnv: SOURCE_ARGS
+    extractToolEnv: SOURCE_EXTRACT_TOOL
+
+editorial:
+  defaultThreadCount: 7
+  briefingProvider: optional-llm
+  exportFormat: notebooklm_markdown
+  audioProvider: notebooklm
+
+outputs:
+  markdownDir: exports
+  releaseDir: releases
+  validatorScript: scripts/validate_feed.py

@@ -1,0 +1,227 @@
+"""Reusable CLI pipeline orchestration for show repositories."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import logging
+import os
+import sys
+from dataclasses import dataclass
+from datetime import date
+from pathlib import Path
+from typing import Any, Callable
+
+from dotenv import load_dotenv
+
+from castforge.briefing import write_briefing_markdown
+from castforge.export import DEFAULT_EXPORT_DIR, DEFAULT_MARKDOWN_NAME, export_for_notebooklm
+from castforge.notebooklm_audio import publish_weekly_audio
+
+DEFAULT_RELEASES_DIR = Path("releases")
+
+
+@dataclass(frozen=True)
+class PipelineHooks:
+    extract_weekly_key_info: Callable[[], list[dict[str, Any]]]
+    fetch_thread_details: Callable[[list[dict[str, Any]]], list[dict[str, Any]]]
+    list_mcp_tools: Callable[[], list[Any]]
+    select_threads: Callable[[list[dict[str, Any]]], list[dict[str, Any]]]
+    threads_to_source_markdown: Callable[[list[dict[str, Any]]], str]
+    write_forum_post: Callable[..., Path]
+    generate_rss_feed: Callable[..., Path]
+    episode_file_prefix: str
+    week_episode_filename: Callable[[int, int], str]
+    week_episode_url: Callable[[int, int], str]
+
+
+def _week_filename(prefix: str, ext: str = ".md") -> str:
+    iso = date.today().isocalendar()
+    return f"{prefix}_{iso.year}-W{iso.week:02d}{ext}"
+
+
+def _default_audio_out(dated: bool, hooks: PipelineHooks) -> Path:
+    iso = date.today().isocalendar()
+    name = hooks.week_episode_filename(iso.year, iso.week) if dated else f"{hooks.episode_file_prefix}_podcast.mp3"
+    return (DEFAULT_RELEASES_DIR / name).resolve()
+
+
+def _setup_logging(level: str) -> None:
+    logging.basicConfig(
+        level=getattr(logging, level.upper(), logging.INFO),
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        datefmt="%Y-%m-%dT%H:%M:%S",
+        stream=sys.stderr,
+    )
+
+
+def build_parser(*, episode_file_prefix: str) -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Source -> NotebookLM Markdown export pipeline")
+    parser.add_argument("--env-file", type=Path, default=Path(".env"), help="Dotenv path (default: .env)")
+    parser.add_argument("--skip-briefing", action="store_true", help="Skip Gemini; export structured Markdown from extraction only")
+    parser.add_argument("--export-dir", type=Path, default=None, help=f"Export directory (default: {DEFAULT_EXPORT_DIR})")
+    parser.add_argument(
+        "--output-filename",
+        default=None,
+        help=f"Output filename (default: {DEFAULT_MARKDOWN_NAME} or ISO-week name if --dated)",
+    )
+    parser.add_argument("--dated", action="store_true", help=f"Use ISO week filename {episode_file_prefix}_YYYY-Www.md")
+    parser.add_argument("--log-level", default="INFO", help="Logging level (DEBUG, INFO, WARNING, ERROR)")
+    parser.add_argument(
+        "--list-mcp-tools",
+        action="store_true",
+        help="Connect to MCP server, print tool names/schemas as JSON, exit",
+    )
+    parser.add_argument(
+        "--skip-details",
+        action="store_true",
+        help="Skip fetching thread replies/details (faster, uses only OP-level data)",
+    )
+    parser.add_argument(
+        "--markdown-input",
+        type=Path,
+        default=None,
+        help="Skip extraction; use this existing Markdown file as input (for reuse across pipeline phases)",
+    )
+    parser.add_argument(
+        "--publish-notebooklm",
+        action="store_true",
+        help="After export: upload Markdown to NotebookLM, generate Audio Overview, download MP3",
+    )
+    parser.add_argument(
+        "--notebooklm-audio-out",
+        type=Path,
+        default=None,
+        help=f"Path for downloaded audio (default: releases/{episode_file_prefix}_YYYY-Www.mp3 if --dated else releases/{episode_file_prefix}_podcast.mp3)",
+    )
+    parser.add_argument("--generate-post", action="store_true", help="Generate a forum/community post alongside the export")
+    parser.add_argument("--audio-url", default=None, help="Podcast episode URL to embed in post and RSS")
+    parser.add_argument("--generate-rss", action="store_true", help="Generate/update podcast RSS feed")
+    parser.add_argument("--rss-output", type=Path, default=None, help="Path for RSS feed file")
+    parser.add_argument("--episode-duration", default="00:06:00", help="Episode duration as HH:MM:SS for RSS feed")
+    parser.add_argument("--mp3-path", type=Path, default=None, help="Path to local MP3 file for RSS enclosure size detection")
+    return parser
+
+
+def main(argv: list[str] | None, *, hooks: PipelineHooks) -> int:
+    parser = build_parser(episode_file_prefix=hooks.episode_file_prefix)
+    args = parser.parse_args(argv)
+
+    _setup_logging(args.log_level)
+    log = logging.getLogger("castforge.pipeline")
+
+    if args.env_file.is_file():
+        load_dotenv(args.env_file, override=False)
+    else:
+        load_dotenv(override=False)
+
+    if args.list_mcp_tools:
+        try:
+            tools = hooks.list_mcp_tools()
+            out = [
+                {
+                    "name": t.name,
+                    "description": getattr(t, "description", None),
+                    "inputSchema": getattr(t, "inputSchema", None),
+                }
+                for t in tools
+            ]
+            json.dump(out, sys.stdout, ensure_ascii=False, indent=2)
+            sys.stdout.write("\n")
+            return 0
+        except Exception:
+            log.exception("Failed to list MCP tools")
+            return 1
+
+    export_dir = args.export_dir if args.export_dir is not None else DEFAULT_EXPORT_DIR
+    if args.output_filename:
+        filename = args.output_filename
+    elif args.dated:
+        filename = _week_filename(hooks.episode_file_prefix)
+    else:
+        filename = DEFAULT_MARKDOWN_NAME
+
+    try:
+        if args.markdown_input:
+            md_input = Path(args.markdown_input).resolve()
+            if not md_input.is_file():
+                log.error("Markdown input not found: %s", md_input)
+                return 1
+            body = md_input.read_text(encoding="utf-8")
+            path = md_input
+            threads = None
+            log.info("Using existing Markdown: %s", path)
+        else:
+            threads = hooks.extract_weekly_key_info()
+            if not threads:
+                log.error("Extraction returned no threads")
+                return 1
+
+            if len(threads) > 7:
+                threads = hooks.select_threads(threads)
+                log.info("Selected %d threads after scoring", len(threads))
+
+            if not args.skip_details:
+                log.info("Fetching thread details (replies) for %d threads", len(threads))
+                threads = hooks.fetch_thread_details(threads)
+
+            raw_md = hooks.threads_to_source_markdown(threads)
+
+            if args.skip_briefing:
+                body = raw_md
+                log.info("Skipping Gemini briefing")
+            else:
+                body = write_briefing_markdown(raw_md)
+
+            path = export_for_notebooklm(body, export_dir=export_dir, filename=filename)
+            log.info("Wrote NotebookLM source: %s", path)
+
+        audio_path = None
+
+        if args.publish_notebooklm:
+            audio_path = args.notebooklm_audio_out
+            if audio_path is None:
+                audio_path = _default_audio_out(args.dated, hooks)
+            else:
+                audio_path = audio_path.resolve()
+            log.info("Publishing to NotebookLM; audio output: %s", audio_path)
+            publish_weekly_audio(path, audio_path)
+            log.info("Downloaded Audio Overview: %s", audio_path)
+
+        if args.generate_post:
+            platform_links = None
+            raw_links = os.environ.get("PODCAST_PLATFORM_LINKS", "").strip()
+            if raw_links:
+                try:
+                    platform_links = json.loads(raw_links)
+                except json.JSONDecodeError:
+                    log.warning("PODCAST_PLATFORM_LINKS is not valid JSON; ignoring")
+            post_path = hooks.write_forum_post(
+                path, audio_url=args.audio_url, extra_links=platform_links, threads=threads,
+            )
+            log.info("Wrote forum post: %s", post_path)
+
+        if args.generate_rss:
+            rss_audio_url = args.audio_url
+            if not rss_audio_url:
+                iso = date.today().isocalendar()
+                rss_audio_url = hooks.week_episode_url(iso.year, iso.week)
+            rss_mp3 = args.mp3_path or audio_path
+            feed_path = hooks.generate_rss_feed(
+                path,
+                args.rss_output,
+                audio_url=rss_audio_url,
+                duration=args.episode_duration,
+                threads=threads,
+                mp3_path=rss_mp3,
+            )
+            log.info("Updated RSS feed: %s", feed_path)
+
+        if audio_path and audio_path.is_file():
+            print(str(audio_path), file=sys.stdout)
+        else:
+            print(str(path), file=sys.stdout)
+        return 0
+    except Exception:
+        log.exception("Pipeline failed")
+        return 1
