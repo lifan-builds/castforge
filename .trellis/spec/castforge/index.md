@@ -7,13 +7,15 @@ CastForge is a reusable Python framework for automated podcast pipelines. Read t
 1. Read [Framework and Show Ownership](framework-show-ownership.md) before changing pipeline hooks, examples, instance contracts, or publishing-related behavior.
 2. Read [Python Packaging](python-packaging.md) before changing Python code, dependencies, optional integrations, or package metadata.
 3. Read [Verification](verification.md) and select checks supported by the repository; do not invent undeclared test or lint gates.
-4. Keep credentials, show-specific prompts and identity, private source material, generated audio, feeds, episodes, and publication artifacts outside framework specifications and commits.
+4. Read [Artifact and Publication Contract](artifact-and-publication-contract.md) before changing models, CLI commands, manifests, RSS, R2, transcript/chapter metadata, or fail-closed ordering.
+5. Keep credentials, show-specific prompts and identity, private source material, generated audio, feeds, episodes, and publication artifacts outside framework specifications and commits.
 
 ## Topics
 
 - [Framework and Show Ownership](framework-show-ownership.md) — framework/show responsibilities and stable public contracts.
 - [Python Packaging](python-packaging.md) — supported Python version, setuptools build, and optional integration boundaries.
 - [Verification](verification.md) — package-build validation and runtime-check exclusions.
+- [Artifact and Publication Contract](artifact-and-publication-contract.md) — typed artifacts, qualification, CLI, R2, RSS, and atomic publication.
 
 ## Quality Check
 

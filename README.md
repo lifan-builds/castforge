@@ -1,74 +1,111 @@
 # CastForge
 
-Open-source framework for automated podcast pipelines.
+Open-source Python framework for repeatable, source-transparent podcast pipelines.
 
-CastForge helps you build repeatable source-to-podcast workflows: extract content, shape it into episode materials, generate audio, publish artifacts, and run the whole thing on a schedule.
+CastForge separates reusable production mechanics from show-owned editorial policy. It can normalize cited sources, record an auditable episode manifest, generate NotebookLM audio, publish MP3s to Cloudflare R2, update RSS atomically, and validate the result. Each show keeps its own sources, prompts, identity, schedule, and feed.
 
-## Why CastForge
+CastForge powers [Nitan Podcast](https://github.com/lifan-builds/nitan-podcast), a production Chinese podcast generated from USCardForum discussions.
 
-Most podcast automation code is reusable.
-Most podcast editorial logic is not.
-
-CastForge separates those concerns:
-
-- `CastForge` provides reusable pipeline stages, LLM integrations, audio tooling, and export helpers
-- each show repo keeps its own source adapters, prompts, branding, scheduling, RSS identity, and published assets
-
-This keeps the framework generic while letting each podcast stay opinionated.
-
-## How It Works
-
-CastForge is a Python package that your podcast repo depends on.
-
-Your show repo owns:
-
-- its GitHub Actions workflow and cron schedule
-- its secrets and runner configuration
-- its source extraction logic
-- its prompts and editorial templates
-- its published feed, episodes, and assets
-
-CastForge provides:
-
-- reusable pipeline orchestration
-- LLM briefing helpers (Gemini)
-- audio generation integration (NotebookLM)
-- Markdown export utilities
-- a hooks-based pipeline model so each show can plug in its own logic
-
-## Quick Start
-
-In your podcast repository:
+## Install
 
 ```bash
-pip install git+https://github.com/lifan-builds/castforge.git
+pip install castforge
+
+# Optional production integrations
+pip install "castforge[notebooklm]"
+pip install "castforge[r2]"
 ```
 
-### Optional extras
+Python 3.10 or newer is supported. Gemini, NotebookLM, and R2 dependencies remain optional.
 
-CastForge core depends only on `anyio` and `python-dotenv`. Integrations are optional:
+## First episode in under 20 minutes
 
 ```bash
-# Gemini briefing (`castforge.briefing`)
-pip install "castforge[gemini] @ git+https://github.com/lifan-builds/castforge.git"
-
-# NotebookLM audio (`castforge.notebooklm_audio`)
-pip install "castforge[notebooklm] @ git+https://github.com/lifan-builds/castforge.git"
-
-# Both
-pip install "castforge[gemini,notebooklm] @ git+https://github.com/lifan-builds/castforge.git"
+mkdir my-show && cd my-show
+castforge init
+castforge run --config podcast.yaml --date 2026-08-11
+castforge validate --config podcast.yaml --date 2026-08-11
 ```
 
-After CastForge is published to PyPI, replace the git URL with `castforge` and the same extras.
+The fixture-backed starter creates:
 
-Then write a thin `run_pipeline.py` that wires your show-specific hooks into the CastForge pipeline:
+- a cited NotebookLM source document;
+- a deterministic episode manifest;
+- an RSS feed with a positive audio enclosure contract.
+
+Fixture mode does not call an LLM, audio service, or public endpoint. Replace the example sources and public values before production use.
+
+## Core contracts
+
+```python
+from castforge import EpisodeManifest, SourceItem, StoryCluster
+from castforge.contracts import AudioProvider, Publisher, SourceAdapter
+```
+
+- `SourceItem` normalizes one primary, independent, or trend-signal source.
+- `StoryCluster` groups duplicate coverage and qualifies only a primary source or two independent reports.
+- `EpisodeManifest` preserves the selected stories, citations, source document, pipeline version, and public audio identity.
+- `SourceAdapter`, `AudioProvider`, and `Publisher` are intentionally small protocols implemented by show repositories or integrations.
+
+The generic CLI consumes `podcast.yaml`; show-specific collectors and ranking remain in the show repository.
+
+## Commands
+
+```bash
+castforge init [directory]
+castforge run --config podcast.yaml --date YYYY-MM-DD [--shadow]
+castforge validate --config podcast.yaml [--date YYYY-MM-DD] [--check-public]
+```
+
+`--shadow` creates the source and manifest artifacts but does not mutate RSS or R2. Same-date production reruns replace the date-keyed RSS item instead of duplicating it.
+
+## Production configuration
+
+See [`examples/podcast.yaml`](examples/podcast.yaml) for the complete schema.
+
+For NotebookLM:
+
+```yaml
+audio:
+  provider: notebooklm
+  output_dir: build/audio
+  duration: 00:06:00
+  public_url_template: https://audio.example.com/episodes/{filename}
+  language: en
+  audio_length: short
+```
+
+Install and authenticate the integration once on the runner:
+
+```bash
+pip install "castforge[notebooklm]"
+playwright install chromium
+notebooklm login
+```
+
+Set `NOTEBOOKLM_NOTEBOOK_ID`. Authentication state and notebook ownership stay outside the show repository.
+
+For Cloudflare R2:
+
+```yaml
+publication:
+  provider: r2
+  bucket: podcast-audio
+  endpoint_url: https://ACCOUNT_ID.r2.cloudflarestorage.com
+  public_base_url: https://audio.example.com
+  access_key_env: R2_ACCESS_KEY_ID
+  secret_key_env: R2_SECRET_ACCESS_KEY
+  download_url_prefix: https://op3.dev/e/
+```
+
+CastForge uploads MP3s as `audio/mpeg`, then sends a public `HEAD` request and verifies status, MIME type, and byte length before updating RSS. A show may apply a privacy-respecting download redirect such as OP3 after the R2 origin passes validation. A failed generation, upload, or public check leaves the feed unchanged.
+
+## Existing hook pipeline
+
+Production shows can continue wiring show-specific extraction and publishing through `PipelineHooks` while migrating to config-driven artifacts:
 
 ```python
 from castforge.pipeline import PipelineHooks, main as castforge_main
-from my_show.extractor import extract, fetch_details, list_tools, select, to_markdown
-from my_show.publisher import write_post
-from my_show.rss import generate_feed
-from my_show.config import EPISODE_PREFIX, episode_filename, episode_url
 
 def main(argv=None):
     hooks = PipelineHooks(
@@ -79,88 +116,24 @@ def main(argv=None):
         threads_to_source_markdown=to_markdown,
         write_forum_post=write_post,
         generate_rss_feed=generate_feed,
-        episode_file_prefix=EPISODE_PREFIX,
+        episode_file_prefix="weekly_episode",
         week_episode_filename=episode_filename,
         week_episode_url=episode_url,
     )
     return castforge_main(argv, hooks=hooks)
-
-if __name__ == "__main__":
-    raise SystemExit(main())
 ```
 
-## Pipeline Stages
+CastForge owns execution and provider integrations. The show owns sources, editorial policy, branding, secrets, scheduling, feeds, episodes, and public compatibility.
 
-CastForge organizes work into stages:
+## Development
 
-- `extract` — fetch source content via your adapter
-- `select` — choose items for the episode
-- `brief` — optionally rewrite/shape material with an LLM
-- `export` — produce a source document for the audio engine
-- `audio` — generate podcast audio (NotebookLM integration included)
-- `publish` — create downstream outputs (RSS, forum posts, release artifacts)
-- `validate` — run post-publish checks
-
-Each stage is customizable through the `PipelineHooks` interface.
-
-## Instance Contract
-
-Each show repo can expose a `podcast.yaml` describing its identity and public URLs. See `examples/podcast.yaml` for the format.
-
-The key rule: subscriber-facing values (feed URL, episode URLs, GUIDs) must remain stable across automation changes.
-
-## Example Workflow
-
-See `examples/weekly-podcast.yml` for a GitHub Actions workflow template. Copy it into your show repo and adjust the schedule, runner labels, and pipeline flags.
-
-The key step is installing CastForge as a dependency:
-
-```yaml
-- run: $PY -m pip install -q git+https://github.com/lifan-builds/castforge.git
+```bash
+python -m pip install -e ".[test]"
+python -m pytest
+python -m build
 ```
 
-## Example
-
-CastForge powers [`nitan-podcast`](https://github.com/lifan-builds/nitan-podcast), a weekly Chinese podcast generated from hot USCardForum discussions.
-
-In that setup:
-
-- `nitan-podcast` owns its workflow, schedule, feed, episodes, and public URLs
-- `nitan-podcast` installs `castforge` as a dependency and delegates pipeline execution to it
-
-## Design Principle
-
-**The framework provides reusable execution.**
-**The show repo owns identity, scheduling, and publishing.**
-
-## Status
-
-CastForge is being extracted from a working production podcast pipeline. The first public version includes:
-
-- reusable pipeline stages with a hooks interface
-- Gemini briefing integration
-- NotebookLM audio integration
-- Markdown export utilities
-- instance contract documentation
-- example workflow and configuration
-
-## Contributing
-
-Issues and PRs are welcome, especially for:
-
-- source adapters
-- publishing integrations
-- new audio/LLM provider support
-- documentation for show authors
-- example show templates
-
-## Publishing to PyPI (maintainers)
-
-1. Bump `version` in `pyproject.toml`.
-2. Build: `python -m pip install build twine && python -m build`.
-3. Upload: `python -m twine upload dist/*` (requires a [PyPI](https://pypi.org) API token).
-
-Until the package is on PyPI, show repos can keep installing from git as in `examples/weekly-podcast.yml`.
+Tests are offline and use fake provider clients. Live NotebookLM and R2 checks require explicit credentials and are not part of the ordinary suite.
 
 ## License
 

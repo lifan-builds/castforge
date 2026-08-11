@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 
 from castforge.briefing import write_briefing_markdown
 from castforge.export import DEFAULT_EXPORT_DIR, DEFAULT_MARKDOWN_NAME, export_for_notebooklm
-from castforge.notebooklm_audio import publish_weekly_audio
+from castforge.notebooklm_audio import publish_audio
 
 DEFAULT_RELEASES_DIR = Path("releases")
 
@@ -185,7 +185,7 @@ def main(argv: list[str] | None, *, hooks: PipelineHooks) -> int:
             else:
                 audio_path = audio_path.resolve()
             log.info("Publishing to NotebookLM; audio output: %s", audio_path)
-            publish_weekly_audio(path, audio_path)
+            publish_audio(path, audio_path)
             log.info("Downloaded Audio Overview: %s", audio_path)
 
         if args.generate_post:

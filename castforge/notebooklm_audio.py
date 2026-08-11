@@ -11,7 +11,7 @@ import anyio
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_INSTRUCTIONS = """请用简体中文录制本期播客，语速偏快、节奏紧凑。
+_DEFAULT_INSTRUCTIONS_ZH = """请用简体中文录制本期播客，语速偏快、节奏紧凑。
 
 【开场格式】
 不要介绍论坛或资料来源是什么。直接用一句话说明本期内容，然后快速抛出2-3个关键词作为 hook，吸引听众继续听。
@@ -27,6 +27,12 @@ _DEFAULT_INSTRUCTIONS = """请用简体中文录制本期播客，语速偏快�
 
 【语气】
 像两个熟悉主题的人聊天，不要播音腔，不要过度客套。可以有轻微调侃和个人倾向，但必须服从来源文档中的 Editorial Voice 和事实边界。"""
+
+_DEFAULT_INSTRUCTIONS_EN = """Record a concise English briefing with a brisk, conversational pace.
+
+Open with one sentence explaining what matters today, then cover each story in the source document. For every story, establish what happened, the essential context, and the cited evidence before adding interpretation. Treat uncertainty and disagreement explicitly. Do not invent missing facts, sources, quotes, or causal claims.
+
+Sound like two informed builders comparing notes rather than broadcast announcers. Keep the discussion focused on practical implications and use only information contained in the source document."""
 
 _INTEGRATION_HINT = (
     "Install optional deps: pip install -r requirements-integrations.txt && "
@@ -85,8 +91,9 @@ def _config_from_env() -> dict[str, Any]:
             "NOTEBOOKLM_NOTEBOOK_ID is required for programmatic publish "
             "(create a notebook in the UI, copy its id from the URL or metadata)."
         )
-    instructions = os.environ.get("NOTEBOOKLM_AUDIO_INSTRUCTIONS", "").strip() or _DEFAULT_INSTRUCTIONS
-    language = os.environ.get("NOTEBOOKLM_AUDIO_LANGUAGE", "zh").strip() or "zh"
+    language = os.environ.get("NOTEBOOKLM_AUDIO_LANGUAGE", "en").strip() or "en"
+    default_instructions = _DEFAULT_INSTRUCTIONS_ZH if language.lower().startswith("zh") else _DEFAULT_INSTRUCTIONS_EN
+    instructions = os.environ.get("NOTEBOOKLM_AUDIO_INSTRUCTIONS", "").strip() or default_instructions
     gen_timeout = float(os.environ.get("NOTEBOOKLM_GENERATION_TIMEOUT", "600"))
     source_wait = float(os.environ.get("NOTEBOOKLM_SOURCE_WAIT_TIMEOUT", "180"))
     storage_path = os.environ.get("NOTEBOOKLM_STORAGE_PATH", "").strip() or None
@@ -106,7 +113,7 @@ def _config_from_env() -> dict[str, Any]:
     }
 
 
-async def publish_weekly_audio_async(
+async def publish_audio_async(
     markdown_path: Path,
     *,
     output_audio: Path,
@@ -119,6 +126,7 @@ async def publish_weekly_audio_async(
     http_timeout: float | None = None,
     audio_format: Any | None = None,
     audio_length: Any | None = None,
+    audio_length_name: str | None = None,
 ) -> Path:
     """Upload markdown, generate audio for that source, and download it."""
     NotebookLMClient, AudioFormat, AudioLength = _ensure_notebooklm_imported()
@@ -134,8 +142,9 @@ async def publish_weekly_audio_async(
     al = audio_length
     if af is None and cfg["audio_format_name"]:
         af = _parse_audio_format(cfg["audio_format_name"], AudioFormat)
-    if al is None and cfg["audio_length_name"]:
-        al = _parse_audio_length(cfg["audio_length_name"], AudioLength)
+    configured_length = audio_length_name or cfg["audio_length_name"]
+    if al is None and configured_length:
+        al = _parse_audio_length(configured_length, AudioLength)
 
     md = Path(markdown_path).resolve()
     if not md.is_file():
@@ -198,7 +207,7 @@ async def publish_weekly_audio_async(
     return out
 
 
-def publish_weekly_audio(
+def publish_audio(
     markdown_path: Path,
     output_audio: Path,
     **kwargs: Any,
@@ -206,8 +215,14 @@ def publish_weekly_audio(
     """Sync wrapper for jobs and CLI."""
 
     async def _runner() -> Path:
-        return await publish_weekly_audio_async(
+        return await publish_audio_async(
             markdown_path, output_audio=output_audio, **kwargs
         )
 
     return anyio.run(_runner)
+
+
+# Backward-compatible aliases for the production Nitan show while it migrates
+# to the schedule-neutral names.
+publish_weekly_audio_async = publish_audio_async
+publish_weekly_audio = publish_audio

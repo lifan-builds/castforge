@@ -1,109 +1,47 @@
-# Example GitHub Actions workflow for a show repo using CastForge.
-#
-# Copy this file into your podcast repo at .github/workflows/weekly-podcast.yml
-# and adjust the schedule, runner labels, and pipeline flags to match your show.
-
-name: weekly-podcast
+# Example show-owned workflow. Adjust cadence, runner, and paths for your show.
+name: podcast
 
 on:
   schedule:
-    - cron: "0 14 * * 1"   # Monday 6 AM PST / 2 PM UTC (adjust to your timezone)
-    - cron: "0 20 * * 1"   # Monday 12 PM PST / 8 PM UTC
-    - cron: "0 2 * * 2"    # Monday 6 PM PST / Tue 2 AM UTC
+    - cron: "0 14 * * 1"
   workflow_dispatch:
     inputs:
-      skip_audio:
-        description: "Skip audio generation"
+      shadow:
+        description: Generate artifacts without public publication
         type: boolean
         default: false
-      audio_url:
-        description: "Override audio URL (skip generation, use this URL)"
-        type: string
-        default: ""
 
 permissions:
   contents: write
 
 jobs:
-  weekly-podcast:
+  publish:
     runs-on: [self-hosted, macos]
     env:
-      PY: .venv/bin/python
+      NOTEBOOKLM_NOTEBOOK_ID: ${{ secrets.NOTEBOOKLM_NOTEBOOK_ID }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
     steps:
-      - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@v5
 
-      - name: Load .env from host
+      - name: Install
+        run: python3 -m pip install "castforge[notebooklm,r2]"
+
+      - name: Run episode
         run: |
-          # Adjust the path to match your runner's .env location
-          DOTENV="$HOME/.my-podcast/.env"
-          if [ -f "$DOTENV" ]; then
-            cp "$DOTENV" .env
-          else
-            echo "::error::.env not found at $DOTENV"
-            exit 1
-          fi
+          FLAGS=""
+          if [ "${{ inputs.shadow }}" = "true" ]; then FLAGS="--shadow"; fi
+          castforge run --config podcast.yaml --date "$(date +%F)" $FLAGS
 
-      - name: Setup venv and install dependencies
-        run: |
-          if [ ! -x .venv/bin/python ]; then
-            python3 -m venv .venv
-          fi
-          # Install CastForge framework
-          $PY -m pip install -q git+https://github.com/lifan-builds/castforge.git
-          # Install show-specific dependencies
-          $PY -m pip install -q -r requirements.txt
+      - name: Validate
+        if: inputs.shadow != true
+        run: castforge validate --config podcast.yaml --date "$(date +%F)" --check-public
 
-      # --- Customize the pipeline flags below for your show ---
-
-      - name: Extract and export
-        id: export
-        run: |
-          $PY run_pipeline.py --dated --skip-briefing --log-level INFO
-          # Set the markdown path for later phases
-          ISO_WEEK=$(date +%G-W%V)
-          echo "md_path=exports/weekly_episode_${ISO_WEEK}.md" >> $GITHUB_OUTPUT
-
-      - name: Generate audio
-        if: inputs.skip_audio != true && inputs.audio_url == ''
-        id: audio
-        continue-on-error: true
-        run: |
-          ISO_WEEK=$(date +%G-W%V)
-          MP3="releases/weekly_episode_${ISO_WEEK}.mp3"
-          $PY run_pipeline.py --markdown-input "${{ steps.export.outputs.md_path }}" \
-            --publish-notebooklm --notebooklm-audio-out "$MP3" --log-level INFO
-          echo "mp3_path=$MP3" >> $GITHUB_OUTPUT
-          echo "has_audio=true" >> $GITHUB_OUTPUT
-
-      - name: Publish artifacts
-        run: |
-          # Copy MP3 to docs/episodes for GitHub Pages hosting
-          MP3="${{ steps.audio.outputs.mp3_path }}"
-          if [ -n "$MP3" ] && [ -f "$MP3" ]; then
-            mkdir -p docs/episodes
-            cp "$MP3" "docs/episodes/$(basename "$MP3")"
-          fi
-
-      - name: Generate RSS feed
-        run: |
-          AUDIO_URL="${{ inputs.audio_url }}"
-          MP3="${{ steps.audio.outputs.mp3_path }}"
-          FLAGS="--markdown-input ${{ steps.export.outputs.md_path }} --generate-rss --log-level INFO"
-          if [ -n "$AUDIO_URL" ]; then
-            FLAGS="$FLAGS --audio-url $AUDIO_URL"
-          elif [ -n "$MP3" ] && [ -f "$MP3" ]; then
-            FLAGS="$FLAGS --mp3-path $MP3"
-          fi
-          $PY run_pipeline.py $FLAGS
-
-      - name: Commit and push
+      - name: Commit public metadata
+        if: inputs.shadow != true
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/feed.xml docs/episodes/
-          if ! git diff --cached --quiet; then
-            git commit -m "chore: publish episode $(date +%G-W%V)"
-            git push
-          fi
+          git add docs/ build/manifests/ build/sources/
+          git diff --cached --quiet || git commit -m "chore: publish episode $(date +%F)"
+          git push

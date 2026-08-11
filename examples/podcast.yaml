@@ -1,42 +1,43 @@
-apiVersion: castforge.dev/v1alpha1
-kind: PodcastInstance
+version: 1
 
-metadata:
+show:
   slug: example-podcast
-  displayName: Example Podcast
+  title: Example Podcast
+  description: A source-transparent podcast powered by CastForge.
   language: en
-  description: Example show repository contract for CastForge.
-
-publicContract:
-  siteUrl: https://example.com/podcast/
-  feedUrl: https://example.com/podcast/feed.xml
-  audioBaseUrl: https://example.com/podcast/episodes
-  coverArtUrl: https://example.com/podcast/assets/cover.png
-  episodeFilePrefix: weekly_episode
-  episodeGuidPrefix: example-podcast
-  publishPaths:
-    feed: docs/feed.xml
-    audioDir: docs/episodes
-  invariants:
-    - Keep the public feed URL stable once subscribers exist.
-    - Keep historical episode URLs stable.
-    - Keep GUIDs stable across automation changes.
+  author: Example Publisher
+  site_url: https://example.com/podcast/
+  feed_url: https://example.com/podcast/feed.xml
+  cover_art_url: https://example.com/podcast/cover.png
+  episode_guid_prefix: example-podcast
+  episode_file_prefix: example-podcast
+  cadence: daily
+  timezone: America/Los_Angeles
+  publication_hour: 6
 
 source:
-  adapter: custom-source
-  inputType: structured_items
-  configuration:
-    commandEnv: SOURCE_COMMAND
-    argsEnv: SOURCE_ARGS
-    extractToolEnv: SOURCE_EXTRACT_TOOL
+  fixture: sources.json
 
-editorial:
-  defaultThreadCount: 7
-  briefingProvider: optional-llm
-  exportFormat: notebooklm_markdown
-  audioProvider: notebooklm
+selection:
+  max_stories: 5
+  max_per_organization: 1
+  max_per_category: 1
+  recent_days: 7
+
+audio:
+  provider: fixture
+  output_dir: build/audio
+  duration: 00:06:00
+  public_url_template: https://example.com/podcast/episodes/{filename}
+  fixture_length_bytes: 1024
+  language: en
+  audio_length: short
+
+publication:
+  provider: fixture
 
 outputs:
-  markdownDir: exports
-  releaseDir: releases
-  validatorScript: scripts/validate_feed.py
+  root: build
+  feed: build/feed.xml
+  manifests: build/manifests
+  sources: build/sources

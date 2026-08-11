@@ -1,0 +1,2 @@
+{"file":"../nitan-pod/.trellis/spec/nitan-pod/public-contract.md","reason":"Defines immutable subscriber-facing endpoints."}
+{"file":"../nitan-pod/.trellis/spec/nitan-pod/pipeline-and-editorial.md","reason":"Defines atomic publication and feed behavior."}

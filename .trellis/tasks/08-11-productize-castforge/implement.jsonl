@@ -1,0 +1,3 @@
+{"file":".trellis/spec/castforge/framework-show-ownership.md","reason":"Defines reusable framework versus show-owned behavior."}
+{"file":".trellis/spec/castforge/python-packaging.md","reason":"Defines package and optional dependency contracts."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Defines fail-closed error behavior."}

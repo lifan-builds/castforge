@@ -1,0 +1,30 @@
+{
+  "id": "castforge-growth-ai-briefing",
+  "name": "castforge-growth-ai-briefing",
+  "title": "Castforge growth and AI briefing",
+  "description": "Implement the approved 90-day Castforge, Nitan, and AI Builder Brief plan.",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P0",
+  "creator": "fantasyc",
+  "assignee": "fantasyc",
+  "createdAt": "2026-08-11",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "08-11-productize-castforge",
+    "08-11-repair-showcase-nitan",
+    "08-11-launch-ai-builder-brief"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

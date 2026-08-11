@@ -1,11 +1,8 @@
-"""CLI placeholder for the CastForge extraction."""
+"""Module entry point for ``python -m castforge``."""
 
 from __future__ import annotations
 
-
-def main() -> int:
-    print("CastForge scaffold: pipeline extraction in progress.")
-    return 0
+from castforge.cli import main
 
 
 if __name__ == "__main__":

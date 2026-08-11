@@ -1,0 +1,2 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Defines test quality and failure coverage."}
+{"file":".trellis/spec/castforge/verification.md","reason":"Defines packaging and integration checks."}
