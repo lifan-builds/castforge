@@ -8,12 +8,13 @@ CastForge powers [Nitan Podcast](https://github.com/lifan-builds/nitan-podcast),
 
 ## Install
 
+The `v0.1.0` wheel is attached to the [GitHub release](https://github.com/lifan-builds/castforge/releases/tag/v0.1.0). Until the first PyPI upload is authorized, install the immutable release tag:
+
 ```bash
-pip install castforge
+pip install "castforge @ git+https://github.com/lifan-builds/castforge.git@v0.1.0"
 
 # Optional production integrations
-pip install "castforge[notebooklm]"
-pip install "castforge[r2]"
+pip install "castforge[notebooklm,r2] @ git+https://github.com/lifan-builds/castforge.git@v0.1.0"
 ```
 
 Python 3.10 or newer is supported. Gemini, NotebookLM, and R2 dependencies remain optional.
