@@ -26,3 +26,8 @@ Turn Castforge into a release-ready framework and prove it with both the existin
 - [x] AI Builder Brief can complete a fixture-backed run and a fail-closed production run for a date without duplicate publication.
 - [x] Cross-repository tests confirm Nitan compatibility and the new show's RSS/audio/source-manifest contracts.
 - [x] Promotion artifacts and KPI definitions are present without posting externally before the products are ready.
+- [ ] NotebookLM, transcription, R2, OP3, and repository secrets are production-configured without committing credentials.
+- [ ] Seven real shadow episodes pass the citation, transcript, duplication, duration, and fail-closed launch gates.
+- [ ] AI Builder Brief publishes a validated public episode and its feed is submitted to supported podcast directories.
+- [ ] The staged launch campaign and 30-day reliability report are published with weekly KPI review in place.
+- [ ] At least one non-owner show publishes three consecutive valid episodes using Castforge.
