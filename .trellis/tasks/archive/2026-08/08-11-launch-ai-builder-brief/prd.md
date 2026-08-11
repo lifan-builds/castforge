@@ -16,9 +16,9 @@ Create the source-transparent daily AI briefing reference show.
 
 ## Acceptance Criteria
 
-- [ ] Fixture mode creates a cited manifest, source document, feed, transcript fixture, chapters, and site without network access.
-- [ ] Same-date retries create at most one RSS item and one public object key.
-- [ ] Unqualified stories and duplicate clusters are excluded deterministically.
-- [ ] Audio/upload/public-HEAD failures leave the feed and site unchanged.
-- [ ] Production config targets R2 with `audio/mpeg` and stable date-keyed URLs.
-- [ ] Shadow mode exercises the complete pipeline without mutating public storage or RSS.
+- [x] Fixture mode creates a cited manifest, source document, feed, transcript fixture, chapters, and site without network access.
+- [x] Same-date retries create at most one RSS item and one public object key.
+- [x] Unqualified stories and duplicate clusters are excluded deterministically.
+- [x] Audio/upload/public-HEAD failures leave the feed and site unchanged.
+- [x] Production config targets R2 with `audio/mpeg` and stable date-keyed URLs.
+- [x] Shadow mode exercises the complete pipeline without mutating public storage or RSS.
