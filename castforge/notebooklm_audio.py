@@ -146,35 +146,55 @@ async def publish_weekly_audio_async(
 
     client_ctx = await NotebookLMClient.from_storage(store, timeout=http_to)
     async with client_ctx as client:
-        logger.info("NotebookLM: adding file source %s", md)
-        source = await client.sources.add_file(nb, md, wait=True, wait_timeout=src_to)
-        if source.is_error:
-            raise RuntimeError(f"NotebookLM source failed to index: {source!r}")
-        sid = source.id
-        logger.info("NotebookLM: source ready id=%s, generating audio (language=%r)", sid, lang)
-
-        status = await client.artifacts.generate_audio(
-            nb,
-            source_ids=[sid],
-            language=lang,
-            instructions=instr,
-            audio_format=af,
-            audio_length=al,
-        )
-        final = await client.artifacts.wait_for_completion(
-            nb,
-            status.task_id,
-            timeout=gen_to,
-        )
-        if final.is_failed:
-            raise RuntimeError(
-                f"NotebookLM audio generation failed: status={final.status!r} error={final.error!r}"
+        source_id = None
+        try:
+            logger.info("NotebookLM: adding file source %s", md)
+            source = await client.sources.add_file(nb, md, wait=True, wait_timeout=src_to)
+            if source.is_error:
+                raise RuntimeError(f"NotebookLM source failed to index: {source!r}")
+            source_id = source.id
+            logger.info(
+                "NotebookLM: source ready id=%s, generating audio (language=%r)",
+                source_id,
+                lang,
             )
-        if not final.is_complete:
-            raise RuntimeError(f"NotebookLM audio generation ended incomplete: {final!r}")
 
-        logger.info("NotebookLM: downloading audio to %s", out)
-        await client.artifacts.download_audio(nb, str(out), artifact_id=final.task_id)
+            status = await client.artifacts.generate_audio(
+                nb,
+                source_ids=[source_id],
+                language=lang,
+                instructions=instr,
+                audio_format=af,
+                audio_length=al,
+            )
+            final = await client.artifacts.wait_for_completion(
+                nb,
+                status.task_id,
+                timeout=gen_to,
+            )
+            if final.is_failed:
+                raise RuntimeError(
+                    f"NotebookLM audio generation failed: status={final.status!r} "
+                    f"error={final.error!r}"
+                )
+            if not final.is_complete:
+                raise RuntimeError(f"NotebookLM audio generation ended incomplete: {final!r}")
+
+            logger.info("NotebookLM: downloading audio to %s", out)
+            await client.artifacts.download_audio(nb, str(out), artifact_id=final.task_id)
+        finally:
+            if source_id:
+                try:
+                    await client.sources.delete(nb, source_id)
+                    logger.info("NotebookLM: deleted temporary source id=%s", source_id)
+                except Exception:
+                    # The downloaded MP3 remains valid even if provider-side cleanup fails.
+                    # Preserve the primary pipeline result and make the leak visible in logs.
+                    logger.warning(
+                        "NotebookLM: failed to delete temporary source id=%s",
+                        source_id,
+                        exc_info=True,
+                    )
     return out
 
 
