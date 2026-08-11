@@ -15,8 +15,8 @@ Restore verified feed items, add homepage, regression checks, and retrospective.
 
 ## Acceptance Criteria
 
-- [ ] W31/W32 appear in RSS only if their public audio returns `200 audio/mpeg` with a positive length.
-- [ ] Existing feed/site/audio URLs and GUID formats do not change.
-- [ ] The GitHub Pages root returns a working HTML page with episode playback.
-- [ ] Tests fail when a verified published weekly MP3 is silently omitted from RSS.
-- [ ] The retrospective distinguishes observed facts from lessons and recommendations.
+- [x] W31/W32 appear in RSS only if their public audio returns `200 audio/mpeg` with a positive length.
+- [x] Existing feed/site/audio URLs and GUID formats do not change.
+- [x] The GitHub Pages root returns a working HTML page with episode playback.
+- [x] Tests fail when a verified published weekly MP3 is silently omitted from RSS.
+- [x] The retrospective distinguishes observed facts from lessons and recommendations.
