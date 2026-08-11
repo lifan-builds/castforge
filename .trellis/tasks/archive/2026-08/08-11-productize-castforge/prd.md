@@ -21,10 +21,10 @@ Castforge 0.1.0 currently has hook-based orchestration and NotebookLM/Gemini hel
 
 ## Acceptance Criteria
 
-- [ ] `python -m pytest` passes without network access.
-- [ ] A fresh Python 3.10+ environment installs the built wheel and all three CLI commands execute.
-- [ ] `castforge run` creates deterministic manifest/source/RSS artifacts from a fixture.
-- [ ] A failed audio/upload/validation stage cannot mutate the configured public feed.
-- [ ] Same-date reruns do not duplicate an episode.
-- [ ] R2 upload validation rejects missing, zero-length, or wrong-MIME audio.
-- [ ] Nitan's existing hook-based entry point remains functional after coordinated updates.
+- [x] `python -m pytest` passes without network access.
+- [x] A fresh Python 3.10+ environment installs the built wheel and all three CLI commands execute.
+- [x] `castforge run` creates deterministic manifest/source/RSS artifacts from a fixture.
+- [x] A failed audio/upload/validation stage cannot mutate the configured public feed.
+- [x] Same-date reruns do not duplicate an episode.
+- [x] R2 upload validation rejects missing, zero-length, or wrong-MIME audio.
+- [x] Nitan's existing hook-based entry point remains functional after coordinated updates.
