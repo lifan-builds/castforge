@@ -22,7 +22,7 @@ Turn Castforge into a release-ready framework and prove it with both the existin
 ## Acceptance Criteria
 
 - [ ] Castforge is installable from PyPI, exposes a working CLI, owns deterministic tests, and can publish to R2.
-- [ ] Nitan has a working landing page, verified feed/audio consistency, restored valid missing items, and an evidence-backed retrospective.
-- [ ] AI Builder Brief can complete a fixture-backed run and a fail-closed production run for a date without duplicate publication.
-- [ ] Cross-repository tests confirm Nitan compatibility and the new show's RSS/audio/source-manifest contracts.
-- [ ] Promotion artifacts and KPI definitions are present without posting externally before the products are ready.
+- [x] Nitan has a working landing page, verified feed/audio consistency, restored valid missing items, and an evidence-backed retrospective.
+- [x] AI Builder Brief can complete a fixture-backed run and a fail-closed production run for a date without duplicate publication.
+- [x] Cross-repository tests confirm Nitan compatibility and the new show's RSS/audio/source-manifest contracts.
+- [x] Promotion artifacts and KPI definitions are present without posting externally before the products are ready.
