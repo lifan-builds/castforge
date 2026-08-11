@@ -175,6 +175,7 @@ def run_episode(config: PodcastConfig, episode_date: date, *, shadow: bool = Fal
                 public_base_url=config.publication.public_base_url,
                 access_key_env=config.publication.access_key_env,
                 secret_key_env=config.publication.secret_key_env,
+                max_bucket_bytes=config.publication.max_bucket_bytes,
             )
             audio_url = publisher.publish(audio_path, f"episodes/{filename}")
 

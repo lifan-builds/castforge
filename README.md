@@ -8,13 +8,13 @@ CastForge powers [Nitan Podcast](https://github.com/lifan-builds/nitan-podcast),
 
 ## Install
 
-The `v0.1.0` wheel is attached to the [GitHub release](https://github.com/lifan-builds/castforge/releases/tag/v0.1.0). Until the first PyPI upload is authorized, install the immutable release tag:
+The `v0.1.1` wheel is attached to the [GitHub release](https://github.com/lifan-builds/castforge/releases/tag/v0.1.1). Until the first PyPI upload is authorized, install the immutable release tag:
 
 ```bash
-pip install "castforge @ git+https://github.com/lifan-builds/castforge.git@v0.1.0"
+pip install "castforge @ git+https://github.com/lifan-builds/castforge.git@v0.1.1"
 
 # Optional production integrations
-pip install "castforge[notebooklm,r2] @ git+https://github.com/lifan-builds/castforge.git@v0.1.0"
+pip install "castforge[notebooklm,r2] @ git+https://github.com/lifan-builds/castforge.git@v0.1.1"
 ```
 
 Python 3.10 or newer is supported. Gemini, NotebookLM, and R2 dependencies remain optional.
@@ -97,9 +97,10 @@ publication:
   access_key_env: R2_ACCESS_KEY_ID
   secret_key_env: R2_SECRET_ACCESS_KEY
   download_url_prefix: https://op3.dev/e/
+  max_bucket_bytes: 9000000000
 ```
 
-CastForge uploads MP3s as `audio/mpeg`, then sends a public `HEAD` request and verifies status, MIME type, and byte length before updating RSS. A show may apply a privacy-respecting download redirect such as OP3 after the R2 origin passes validation. A failed generation, upload, or public check leaves the feed unchanged.
+CastForge totals the bucket before each upload and refuses a projected size above `max_bucket_bytes`; overwrites subtract the prior object and listings paginate safely. It then uploads MP3s as `audio/mpeg` and sends a public `HEAD` request to verify status, MIME type, and byte length before updating RSS. A show may apply a privacy-respecting download redirect such as OP3 after the R2 origin passes validation. A failed capacity check, generation, upload, or public check leaves the feed unchanged.
 
 ## Existing hook pipeline
 

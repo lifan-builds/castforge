@@ -74,6 +74,7 @@ class PublicationConfig:
     access_key_env: str = "R2_ACCESS_KEY_ID"
     secret_key_env: str = "R2_SECRET_ACCESS_KEY"
     download_url_prefix: str = ""
+    max_bucket_bytes: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -177,6 +178,7 @@ def load_config(path: Path) -> PodcastConfig:
         access_key_env=str(publication_raw.get("access_key_env", "R2_ACCESS_KEY_ID")),
         secret_key_env=str(publication_raw.get("secret_key_env", "R2_SECRET_ACCESS_KEY")),
         download_url_prefix=str(publication_raw.get("download_url_prefix", "") or ""),
+        max_bucket_bytes=int(publication_raw.get("max_bucket_bytes", 0)),
     )
     if publication.provider not in {"fixture", "r2"}:
         raise ValueError("publication.provider must be fixture or r2")
@@ -186,6 +188,8 @@ def load_config(path: Path) -> PodcastConfig:
         raise ValueError("R2 publication requires bucket, endpoint_url, and public_base_url")
     if publication.provider == "r2" and audio.provider == "fixture":
         raise ValueError("R2 publication requires non-fixture audio")
+    if publication.max_bucket_bytes < 0:
+        raise ValueError("publication.max_bucket_bytes must not be negative")
 
     output_raw = _mapping(root.get("outputs", {}), "outputs")
     output_root = _resolve(base, output_raw.get("root"), "build")

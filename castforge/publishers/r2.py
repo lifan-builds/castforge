@@ -39,11 +39,13 @@ class R2Publisher:
         client: Any,
         bucket: str,
         public_base_url: str,
+        max_bucket_bytes: int = 0,
         opener: Callable[..., Any] = urlopen,
     ) -> None:
         self.client = client
         self.bucket = bucket
         self.public_base_url = public_base_url.rstrip("/")
+        self.max_bucket_bytes = max_bucket_bytes
         self.opener = opener
 
     @classmethod
@@ -55,6 +57,7 @@ class R2Publisher:
         public_base_url: str,
         access_key_env: str = "R2_ACCESS_KEY_ID",
         secret_key_env: str = "R2_SECRET_ACCESS_KEY",
+        max_bucket_bytes: int = 0,
     ) -> "R2Publisher":
         access_key = os.environ.get(access_key_env, "").strip()
         secret_key = os.environ.get(secret_key_env, "").strip()
@@ -71,7 +74,32 @@ class R2Publisher:
             aws_secret_access_key=secret_key,
             region_name="auto",
         )
-        return cls(client=client, bucket=bucket, public_base_url=public_base_url)
+        return cls(
+            client=client,
+            bucket=bucket,
+            public_base_url=public_base_url,
+            max_bucket_bytes=max_bucket_bytes,
+        )
+
+    def _bucket_usage(self, object_key: str) -> tuple[int, int]:
+        total = 0
+        replaced_size = 0
+        continuation_token: str | None = None
+        while True:
+            request = {"Bucket": self.bucket}
+            if continuation_token:
+                request["ContinuationToken"] = continuation_token
+            page = self.client.list_objects_v2(**request)
+            for item in page.get("Contents", []):
+                size = int(item.get("Size", 0))
+                total += size
+                if item.get("Key") == object_key:
+                    replaced_size = size
+            if not page.get("IsTruncated"):
+                return total, replaced_size
+            continuation_token = page.get("NextContinuationToken")
+            if not continuation_token:
+                raise RuntimeError("R2 bucket listing was truncated without a continuation token")
 
     def publish(self, local_audio: Path, object_key: str) -> str:
         audio = Path(local_audio)
@@ -83,6 +111,14 @@ class R2Publisher:
         if audio.suffix.lower() != ".mp3":
             raise ValueError("R2 publisher currently accepts MP3 audio only")
         normalized_key = object_key.lstrip("/")
+        if self.max_bucket_bytes:
+            bucket_size, replaced_size = self._bucket_usage(normalized_key)
+            projected_size = bucket_size - replaced_size + size
+            if projected_size > self.max_bucket_bytes:
+                raise RuntimeError(
+                    "R2 bucket limit would be exceeded: "
+                    f"projected {projected_size} bytes > {self.max_bucket_bytes} bytes"
+                )
         with audio.open("rb") as handle:
             self.client.put_object(
                 Bucket=self.bucket,
