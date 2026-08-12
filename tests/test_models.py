@@ -44,6 +44,29 @@ def test_two_independent_sources_qualify_story() -> None:
     assert story.is_qualified()
 
 
+def test_attributed_expert_analysis_qualifies_only_as_analysis() -> None:
+    story = StoryCluster(
+        id="expert-view",
+        title="An expert observation",
+        summary="An attributed builder observation.",
+        category="expert analysis",
+        organization="Expert",
+        sources=(_source(source="Expert", authority="analysis"),),
+        selection_reason="Actionable attributed analysis",
+        kind="expert_analysis",
+    )
+    assert story.is_qualified()
+    assert not StoryCluster(
+        id="unqualified-claim",
+        title="An unqualified claim",
+        summary="A claim without corroboration.",
+        category="models",
+        organization="Expert",
+        sources=(_source(source="Expert", authority="analysis"),),
+        selection_reason="Analysis is not factual evidence",
+    ).is_qualified()
+
+
 def test_manifest_json_round_trip(tmp_path) -> None:
     story = StoryCluster(
         id="release",

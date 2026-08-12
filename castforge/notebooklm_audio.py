@@ -9,6 +9,8 @@ from typing import Any
 
 import anyio
 
+from castforge.audio import probe_audio_duration
+
 logger = logging.getLogger(__name__)
 
 _DEFAULT_INSTRUCTIONS_ZH = """请用简体中文录制本期播客，语速偏快、节奏紧凑。
@@ -99,7 +101,9 @@ def _config_from_env() -> dict[str, Any]:
     storage_path = os.environ.get("NOTEBOOKLM_STORAGE_PATH", "").strip() or None
     http_timeout = float(os.environ.get("NOTEBOOKLM_HTTP_TIMEOUT", "60"))
     audio_fmt = os.environ.get("NOTEBOOKLM_AUDIO_FORMAT", "").strip() or None
-    audio_len = os.environ.get("NOTEBOOKLM_AUDIO_LENGTH", "").strip() or None
+    # NotebookLM's default length is the first attempt.  Shows may override it
+    # explicitly, while callers can still request a one-time short retry.
+    audio_len = os.environ.get("NOTEBOOKLM_AUDIO_LENGTH", "default").strip() or "default"
     return {
         "notebook_id": notebook_id,
         "instructions": instructions,
@@ -127,6 +131,7 @@ async def publish_audio_async(
     audio_format: Any | None = None,
     audio_length: Any | None = None,
     audio_length_name: str | None = None,
+    max_duration_seconds: float | None = None,
 ) -> Path:
     """Upload markdown, generate audio for that source, and download it."""
     NotebookLMClient, AudioFormat, AudioLength = _ensure_notebooklm_imported()
@@ -168,29 +173,47 @@ async def publish_audio_async(
                 lang,
             )
 
-            status = await client.artifacts.generate_audio(
-                nb,
-                source_ids=[source_id],
-                language=lang,
-                instructions=instr,
-                audio_format=af,
-                audio_length=al,
-            )
-            final = await client.artifacts.wait_for_completion(
-                nb,
-                status.task_id,
-                timeout=gen_to,
-            )
-            if final.is_failed:
-                raise RuntimeError(
-                    f"NotebookLM audio generation failed: status={final.status!r} "
-                    f"error={final.error!r}"
+            async def _generate_download(length: Any | None) -> None:
+                status = await client.artifacts.generate_audio(
+                    nb,
+                    source_ids=[source_id],
+                    language=lang,
+                    instructions=instr,
+                    audio_format=af,
+                    audio_length=length,
                 )
-            if not final.is_complete:
-                raise RuntimeError(f"NotebookLM audio generation ended incomplete: {final!r}")
+                final = await client.artifacts.wait_for_completion(
+                    nb,
+                    status.task_id,
+                    timeout=gen_to,
+                )
+                if final.is_failed:
+                    raise RuntimeError(
+                        f"NotebookLM audio generation failed: status={final.status!r} "
+                        f"error={final.error!r}"
+                    )
+                if not final.is_complete:
+                    raise RuntimeError(f"NotebookLM audio generation ended incomplete: {final!r}")
+                logger.info("NotebookLM: downloading audio to %s", out)
+                await client.artifacts.download_audio(nb, str(out), artifact_id=final.task_id)
 
-            logger.info("NotebookLM: downloading audio to %s", out)
-            await client.artifacts.download_audio(nb, str(out), artifact_id=final.task_id)
+            await _generate_download(al)
+            if max_duration_seconds is not None:
+                measured = probe_audio_duration(out)
+                if measured > max_duration_seconds:
+                    short = _parse_audio_length("short", AudioLength)
+                    if al != short:
+                        logger.warning(
+                            "NotebookLM audio measured %.2fs (> %.2fs); retrying once at short length",
+                            measured,
+                            max_duration_seconds,
+                        )
+                        await _generate_download(short)
+                        measured = probe_audio_duration(out)
+                    if measured > max_duration_seconds:
+                        raise RuntimeError(
+                            f"NotebookLM audio exceeds maximum duration ({measured:.2f}s > {max_duration_seconds:.2f}s)"
+                        )
         finally:
             if source_id:
                 try:

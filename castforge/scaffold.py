@@ -38,7 +38,7 @@ audio:
   public_url_template: https://example.com/podcast/episodes/{filename}
   fixture_length_bytes: 1024
   language: en
-  audio_length: short
+  audio_length: default
 
 publication:
   provider: fixture

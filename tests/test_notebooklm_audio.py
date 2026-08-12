@@ -38,7 +38,7 @@ class FakeArtifacts:
         self.fail = fail
 
     async def generate_audio(self, *args, **kwargs):
-        self.calls.append("generate")
+        self.calls.append(("generate", kwargs.get("audio_length")))
         return type("Status", (), {"task_id": "task-1"})()
 
     async def wait_for_completion(self, *args, **kwargs):
@@ -107,4 +107,42 @@ def test_temporary_source_deleted_after_generation_failure(tmp_path, monkeypatch
     )
     with pytest.raises(RuntimeError, match="generation failed"):
         notebooklm_audio.publish_audio(source, tmp_path / "episode.mp3")
+    assert calls[-1] == "delete"
+
+
+def test_overlong_audio_retries_once_at_short_length(tmp_path, monkeypatch) -> None:
+    calls = []
+    durations = iter((901.0, 600.0))
+    source = tmp_path / "source.md"
+    source.write_text("source", encoding="utf-8")
+    monkeypatch.setenv("NOTEBOOKLM_NOTEBOOK_ID", "notebook")
+    monkeypatch.setattr(notebooklm_audio, "_ensure_notebooklm_imported", lambda: fake_sdk(calls))
+    monkeypatch.setattr(notebooklm_audio, "probe_audio_duration", lambda path: next(durations))
+    notebooklm_audio.publish_audio(
+        source,
+        tmp_path / "episode.mp3",
+        audio_length_name="default",
+        max_duration_seconds=900,
+    )
+    assert [call for call in calls if isinstance(call, tuple)] == [
+        ("generate", "default"),
+        ("generate", "short"),
+    ]
+
+
+def test_audio_still_over_ceiling_after_short_retry_fails_closed(tmp_path, monkeypatch) -> None:
+    calls = []
+    durations = iter((901.0, 901.0))
+    source = tmp_path / "source.md"
+    source.write_text("source", encoding="utf-8")
+    monkeypatch.setenv("NOTEBOOKLM_NOTEBOOK_ID", "notebook")
+    monkeypatch.setattr(notebooklm_audio, "_ensure_notebooklm_imported", lambda: fake_sdk(calls))
+    monkeypatch.setattr(notebooklm_audio, "probe_audio_duration", lambda path: next(durations))
+    with pytest.raises(RuntimeError, match="exceeds maximum duration"):
+        notebooklm_audio.publish_audio(
+            source,
+            tmp_path / "episode.mp3",
+            audio_length_name="default",
+            max_duration_seconds=900,
+        )
     assert calls[-1] == "delete"

@@ -48,6 +48,7 @@ class SourceConfig:
 @dataclass(frozen=True, slots=True)
 class SelectionConfig:
     max_stories: int = 5
+    min_stories: int = 1
     max_per_organization: int = 1
     max_per_category: int = 1
     recent_days: int = 7
@@ -62,7 +63,8 @@ class AudioConfig:
     fixture_length_bytes: int = 0
     language: str = "en"
     instructions: str = ""
-    audio_length: str = "short"
+    audio_length: str = "default"
+    max_duration_seconds: float = 900.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -105,8 +107,8 @@ def load_config(path: Path) -> PodcastConfig:
     config_path = Path(path).resolve()
     raw = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     root = _mapping(raw, "config")
-    if int(root.get("version", 0)) != 1:
-        raise ValueError("version must be 1")
+    if int(root.get("version", 0)) not in {1, 2}:
+        raise ValueError("version must be 1 or 2")
 
     base = config_path.parent
     show_raw = _mapping(root.get("show"), "show")
@@ -142,16 +144,20 @@ def load_config(path: Path) -> PodcastConfig:
     selection_raw = _mapping(root.get("selection", {}), "selection")
     selection = SelectionConfig(
         max_stories=int(selection_raw.get("max_stories", 5)),
+        min_stories=int(selection_raw.get("min_stories", 1)),
         max_per_organization=int(selection_raw.get("max_per_organization", 1)),
         max_per_category=int(selection_raw.get("max_per_category", 1)),
         recent_days=int(selection_raw.get("recent_days", 7)),
     )
     if min(
         selection.max_stories,
+        selection.min_stories,
         selection.max_per_organization,
         selection.max_per_category,
     ) < 1:
         raise ValueError("selection limits must be positive")
+    if selection.min_stories > selection.max_stories:
+        raise ValueError("selection.min_stories must not exceed max_stories")
 
     audio_raw = _mapping(root.get("audio"), "audio")
     audio = AudioConfig(
@@ -162,12 +168,15 @@ def load_config(path: Path) -> PodcastConfig:
         fixture_length_bytes=int(audio_raw.get("fixture_length_bytes", 0)),
         language=str(audio_raw.get("language", show.language)),
         instructions=str(audio_raw.get("instructions", "") or ""),
-        audio_length=str(audio_raw.get("audio_length", "short") or "short"),
+        audio_length=str(audio_raw.get("audio_length", "default") or "default"),
+        max_duration_seconds=float(audio_raw.get("max_duration_seconds", 900.0)),
     )
     if audio.provider not in {"fixture", "notebooklm"}:
         raise ValueError("audio.provider must be fixture or notebooklm")
     if audio.provider == "fixture" and audio.fixture_length_bytes < 1:
         raise ValueError("audio.fixture_length_bytes must be positive for fixture audio")
+    if audio.max_duration_seconds <= 0:
+        raise ValueError("audio.max_duration_seconds must be positive")
 
     publication_raw = _mapping(root.get("publication", {"provider": "fixture"}), "publication")
     publication = PublicationConfig(

@@ -8,7 +8,8 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Literal
 
-SourceAuthority = Literal["primary", "independent", "signal"]
+SourceAuthority = Literal["primary", "independent", "analysis", "signal"]
+StoryKind = Literal["development", "expert_analysis"]
 
 
 def _required_text(value: Any, field_name: str) -> str:
@@ -36,8 +37,8 @@ class SourceItem:
     def __post_init__(self) -> None:
         for name in ("id", "title", "url", "source", "published_at", "summary"):
             object.__setattr__(self, name, _required_text(getattr(self, name), name))
-        if self.authority not in {"primary", "independent", "signal"}:
-            raise ValueError("authority must be primary, independent, or signal")
+        if self.authority not in {"primary", "independent", "analysis", "signal"}:
+            raise ValueError("authority must be primary, independent, analysis, or signal")
         try:
             datetime.fromisoformat(self.published_at.replace("Z", "+00:00"))
         except ValueError as error:
@@ -73,12 +74,16 @@ class StoryCluster:
     organization: str
     sources: tuple[SourceItem, ...]
     selection_reason: str
+    kind: StoryKind = "development"
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         for name in ("id", "title", "summary", "selection_reason"):
             object.__setattr__(self, name, _required_text(getattr(self, name), name))
         if not self.sources:
             raise ValueError("sources must not be empty")
+        if self.kind not in {"development", "expert_analysis"}:
+            raise ValueError("kind must be development or expert_analysis")
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "StoryCluster":
@@ -90,13 +95,22 @@ class StoryCluster:
             organization=str(raw.get("organization", "") or ""),
             sources=tuple(SourceItem.from_dict(item) for item in raw.get("sources", [])),
             selection_reason=raw.get("selection_reason", ""),
+            kind=str(raw.get("kind", "development") or "development"),
+            metadata=dict(raw.get("metadata") or {}),
         )
 
     def is_qualified(self) -> bool:
+        if self.kind == "expert_analysis" and any(item.authority == "analysis" for item in self.sources):
+            # This qualifies the attributed observation itself, not any
+            # technical claim it mentions. Show-owned editorial policy must
+            # attach primary/corroborating evidence before narrating claims.
+            return True
         if any(item.authority == "primary" for item in self.sources):
             return True
         independent = {item.source.casefold() for item in self.sources if item.authority == "independent"}
-        return len(independent) >= 2
+        if len(independent) >= 2:
+            return True
+        return False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -107,6 +121,8 @@ class StoryCluster:
             "organization": self.organization,
             "sources": [item.to_dict() for item in self.sources],
             "selection_reason": self.selection_reason,
+            "kind": self.kind,
+            "metadata": self.metadata,
         }
 
 
@@ -126,7 +142,8 @@ class EpisodeManifest:
     duration: str = ""
     transcript_url: str = ""
     chapters_url: str = ""
-    schema_version: int = 1
+    metadata: dict[str, Any] = field(default_factory=dict)
+    schema_version: int = 2
 
     def __post_init__(self) -> None:
         for name in (
@@ -159,6 +176,7 @@ class EpisodeManifest:
             pipeline_version=raw.get("pipeline_version", ""),
             audio_url=str(raw.get("audio_url", "") or ""),
             duration=str(raw.get("duration", "") or ""),
+            metadata=dict(raw.get("metadata") or {}),
             transcript_url=str(raw.get("transcript_url", "") or ""),
             chapters_url=str(raw.get("chapters_url", "") or ""),
             schema_version=int(raw.get("schema_version", 1)),
@@ -180,6 +198,7 @@ class EpisodeManifest:
             "source_document": self.source_document,
             "audio_url": self.audio_url,
             "duration": self.duration,
+            "metadata": self.metadata,
             "transcript_url": self.transcript_url,
             "chapters_url": self.chapters_url,
             "stories": [story.to_dict() for story in self.stories],

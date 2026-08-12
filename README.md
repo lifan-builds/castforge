@@ -8,13 +8,13 @@ CastForge powers [Nitan Podcast](https://github.com/lifan-builds/nitan-podcast),
 
 ## Install
 
-CastForge `0.1.1` is published on [PyPI](https://pypi.org/project/castforge/0.1.1/) with trusted-publishing attestations:
+CastForge `0.1.2` adds schema-v2 editorial metadata, minimum-story no-episode gating, measured MP3 duration, and a fail-closed NotebookLM short retry above a configured duration ceiling. Releases are published on [PyPI](https://pypi.org/project/castforge/) with trusted-publishing attestations:
 
 ```bash
 pip install castforge==0.1.1
 
 # Optional production integrations
-pip install "castforge[notebooklm,r2]==0.1.1"
+pip install "castforge[notebooklm,r2]==0.1.2"
 ```
 
 Python 3.10 or newer is supported. Gemini, NotebookLM, and R2 dependencies remain optional.
