@@ -1,6 +1,6 @@
 [project]
 name = "castforge"
-version = "0.1.2"
+version = "0.1.3"
 description = "Open-source framework for automated podcast pipelines"
 readme = "README.md"
 license = "MIT"
