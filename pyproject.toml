@@ -18,6 +18,7 @@ classifiers = [
 ]
 dependencies = [
   "anyio>=4",
+  "certifi>=2024.8",
   "python-dotenv>=1",
   "PyYAML>=6",
 ]

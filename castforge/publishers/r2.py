@@ -3,20 +3,27 @@
 from __future__ import annotations
 
 import os
+import ssl
 from pathlib import Path
 from typing import Any, Callable
 from urllib.request import Request, urlopen
+
+import certifi
 
 
 def validate_public_audio(
     url: str,
     *,
     expected_length: int | None = None,
-    opener: Callable[..., Any] = urlopen,
+    opener: Callable[..., Any] | None = None,
     timeout: float = 60,
 ) -> None:
     request = Request(url, method="HEAD", headers={"User-Agent": "CastForge/0.1"})
-    with opener(request, timeout=timeout) as response:
+    effective_opener = opener or urlopen
+    kwargs: dict[str, Any] = {"timeout": timeout}
+    if opener is None:
+        kwargs["context"] = ssl.create_default_context(cafile=certifi.where())
+    with effective_opener(request, **kwargs) as response:
         status = getattr(response, "status", response.getcode())
         content_type = response.headers.get("Content-Type", "").split(";", 1)[0].lower()
         content_length = int(response.headers.get("Content-Length", "0") or 0)

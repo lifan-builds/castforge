@@ -4,7 +4,7 @@ from email.message import Message
 
 import pytest
 
-from castforge.publishers.r2 import R2Publisher
+from castforge.publishers.r2 import R2Publisher, validate_public_audio
 
 
 class FakeClient:
@@ -62,6 +62,18 @@ def test_r2_upload_sets_mime_and_validates_public_object(tmp_path) -> None:
     assert publisher.publish(audio, "episodes/episode.mp3") == "https://audio.example/episodes/episode.mp3"
     assert client.calls[0]["ContentType"] == "audio/mpeg"
     assert client.calls[0]["body"] == b"mp3-data"
+
+
+def test_default_public_validation_uses_packaged_ca_bundle(monkeypatch) -> None:
+    captured = {}
+
+    def open_public(request, **kwargs):
+        captured.update(kwargs)
+        return FakeResponse(content_type="audio/mpeg", content_length=8)
+
+    monkeypatch.setattr("castforge.publishers.r2.urlopen", open_public)
+    validate_public_audio("https://audio.example/episode.mp3", expected_length=8)
+    assert captured["context"].verify_mode.name == "CERT_REQUIRED"
 
 
 def test_r2_rejects_wrong_public_mime(tmp_path) -> None:
