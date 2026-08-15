@@ -27,6 +27,7 @@ class NoEpisodeResult:
     status: str = "no-episode"
     episode_date: date = date.min
     reason: str = ""
+    ledger_path: Path | None = None
 
 
 def _slug(value: str) -> str:

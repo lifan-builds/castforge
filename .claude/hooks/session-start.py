@@ -218,16 +218,11 @@ def _format_git_state(repo_root: Path) -> str:
 def _detect_platform(input_data: dict) -> str | None:
     if isinstance(input_data.get("cursor_version"), str):
         return "cursor"
-    # CLAUDE_PROJECT_DIR is a compatibility alias that several hosts set
-    # alongside their own variable — CodeBuddy, ZCode and Trae all do. It must
-    # therefore be checked LAST, or every one of them is detected as claude and
-    # the context key becomes `claude_<their-session-id>`. That key does not
-    # match the session file `task.py start` wrote under the host's real name,
-    # so every turn reports no_task while the pointer exists on disk.
-    # Observed on CodeBuddy IDE 4.10.4: session file `codebuddy_ae54840e….json`
-    # alongside marker `update-check-claude_ae54840e….marker`, same id.
     env_map = {
+        # ZCode may set both ZCODE_PROJECT_DIR and CLAUDE_PROJECT_DIR; check
+        # ZCODE first so ZCode sessions aren't misdetected as claude.
         "ZCODE_PROJECT_DIR": "zcode",
+        "CLAUDE_PROJECT_DIR": "claude",
         "CURSOR_PROJECT_DIR": "cursor",
         "CODEBUDDY_PROJECT_DIR": "codebuddy",
         "FACTORY_PROJECT_DIR": "droid",
@@ -236,8 +231,6 @@ def _detect_platform(input_data: dict) -> str | None:
         "KIRO_PROJECT_DIR": "kiro",
         "COPILOT_PROJECT_DIR": "copilot",
         "TRAE_PROJECT_DIR": "trae",
-        # Last: the shared alias, only meaningful once no vendor key matched.
-        "CLAUDE_PROJECT_DIR": "claude",
     }
     for env_name, platform in env_map.items():
         if os.environ.get(env_name):
@@ -282,48 +275,17 @@ def _persist_context_key_for_bash(context_key: str | None) -> None:
     variables are then available to Bash tools in the same conversation. Without
     this bridge, `task.py start` has hook stdin during SessionStart but no
     session identity when the AI later runs it as a normal shell command.
-
-    CLAUDE_ENV_FILE is user-owned (conda init, proxy settings, ...) and the host
-    shell sources it for every command, so an unconditional append grows it
-    without bound — one line per SessionStart forever. Skip the write when the
-    *last* existing TRELLIS_CONTEXT_ID export already assigns this value. Last
-    wins in shell, so only the final assignment describes the effective state:
-    "the value appears somewhere in the file" would wrongly skip after a switch
-    A -> B -> A, leaving the shell on B.
     """
     if not context_key:
         return
     env_file = os.environ.get("CLAUDE_ENV_FILE")
     if not env_file:
         return
-    export_line = f"export TRELLIS_CONTEXT_ID={shlex.quote(context_key)}"
     try:
-        if _last_context_key_export(env_file) == export_line:
-            return
         with open(env_file, "a", encoding="utf-8") as handle:
-            handle.write(f"{export_line}\n")
+            handle.write(f"export TRELLIS_CONTEXT_ID={shlex.quote(context_key)}\n")
     except OSError:
         pass  # Optional shell bridge; keep session-start non-fatal.
-
-
-def _last_context_key_export(env_file: str) -> str | None:
-    """Return the last `export TRELLIS_CONTEXT_ID=` line in env_file, if any.
-
-    A missing file means "no previous export" (the caller then creates it).
-    `errors="replace"` matters: a user env file with non-UTF-8 bytes would
-    otherwise raise UnicodeDecodeError, which is a ValueError — not an OSError —
-    and would escape the caller's non-fatal guard.
-    """
-    last_export = None
-    try:
-        with open(env_file, "r", encoding="utf-8", errors="replace") as handle:
-            for raw_line in handle:
-                stripped = raw_line.strip()
-                if stripped.startswith("export TRELLIS_CONTEXT_ID="):
-                    last_export = stripped
-    except FileNotFoundError:
-        return None
-    return last_export
 
 
 def _resolve_update_hint(trellis_dir: Path, context_key: str | None) -> str | None:
