@@ -1,13 +1,22 @@
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
+from dataclasses import asdict
 from datetime import date
+from pathlib import Path
 
 import pytest
 
 from castforge.config import load_config
 from castforge.models import EpisodeManifest
-from castforge.runner import run_episode
+from castforge.runner import NoEpisodeResult, run_episode
+
+
+def test_no_episode_result_preserves_ledger_path_compatibility() -> None:
+    result = NoEpisodeResult(ledger_path=Path("legacy-ledger.json"))
+
+    assert result.ledger_path == Path("legacy-ledger.json")
+    assert asdict(result)["ledger_path"] == Path("legacy-ledger.json")
 
 
 def test_fixture_run_is_source_qualified_and_idempotent(show_project) -> None:
