@@ -220,8 +220,6 @@ def run_episode(config: PodcastConfig, episode_date: date, *, shadow: bool = Fal
             )
             audio_url = publisher.publish(audio_path, f"episodes/{filename}")
 
-    if config.audio.provider != "notebooklm":
-        duration = config.audio.duration
     manifest = replace(
         manifest,
         audio_url=audio_url,
