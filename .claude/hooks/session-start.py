@@ -286,8 +286,8 @@ def _persist_context_key_for_bash(context_key: str | None) -> None:
     CLAUDE_ENV_FILE is user-owned (conda init, proxy settings, ...) and the host
     shell sources it for every command, so an unconditional append grows it
     without bound — one line per SessionStart forever. Skip the write when the
-    *last* existing TRELLIS_CONTEXT_ID export already assigns this value. Last
-    wins in shell, so only the final assignment describes the effective state:
+    last TRELLIS_CONTEXT_ID statement already assigns this value. Last wins in
+    shell, so only the final assignment or unset describes the effective state:
     "the value appears somewhere in the file" would wrongly skip after a switch
     A -> B -> A, leaving the shell on B.
     """
@@ -298,7 +298,7 @@ def _persist_context_key_for_bash(context_key: str | None) -> None:
         return
     export_line = f"export TRELLIS_CONTEXT_ID={shlex.quote(context_key)}"
     try:
-        if _last_context_key_export(env_file) == export_line:
+        if _last_context_key_statement(env_file) == export_line:
             return
         with open(env_file, "a", encoding="utf-8") as handle:
             handle.write(f"{export_line}\n")
@@ -306,24 +306,29 @@ def _persist_context_key_for_bash(context_key: str | None) -> None:
         pass  # Optional shell bridge; keep session-start non-fatal.
 
 
-def _last_context_key_export(env_file: str) -> str | None:
-    """Return the last `export TRELLIS_CONTEXT_ID=` line in env_file, if any.
+def _last_context_key_statement(env_file: str) -> str | None:
+    """Return the last assignment or unset of TRELLIS_CONTEXT_ID, if any.
 
-    A missing file means "no previous export" (the caller then creates it).
+    A missing file means "no previous statement" (the caller then creates it).
     `errors="replace"` matters: a user env file with non-UTF-8 bytes would
     otherwise raise UnicodeDecodeError, which is a ValueError — not an OSError —
     and would escape the caller's non-fatal guard.
     """
-    last_export = None
+    last_statement = None
     try:
         with open(env_file, "r", encoding="utf-8", errors="replace") as handle:
             for raw_line in handle:
                 stripped = raw_line.strip()
-                if stripped.startswith("export TRELLIS_CONTEXT_ID="):
-                    last_export = stripped
+                if re.match(r"^(?:export\s+)?TRELLIS_CONTEXT_ID\s*=", stripped):
+                    last_statement = stripped
+                elif re.match(
+                    r"^unset(?:\s+-[A-Za-z]+)?\s+TRELLIS_CONTEXT_ID(?:\s|$)",
+                    stripped,
+                ):
+                    last_statement = stripped
     except FileNotFoundError:
         return None
-    return last_export
+    return last_statement
 
 
 def _resolve_update_hint(trellis_dir: Path, context_key: str | None) -> str | None:
