@@ -41,7 +41,7 @@ def _clear_context_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv(key, raising=False)
 
 
-def test_codex_does_not_consume_cursor_shell_ticket(
+def test_legacy_cursor_shell_ticket_survives_runtime_upgrade(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -63,21 +63,22 @@ def test_codex_does_not_consume_cursor_shell_ticket(
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(sys, "argv", ["task.py", "current"])
 
-    assert active_task.resolve_context_key(platform="codex") is None
+    assert active_task.resolve_context_key(platform="codex") == "cursor_other_window"
     assert active_task.resolve_context_key(platform="cursor") == "cursor_other_window"
 
 
 @pytest.mark.parametrize(
     ("platform", "env_name", "expected"),
     [
-        ("claude", "CLAUDE_SESSION_ID", "claude_legacy"),
-        ("codex", "CODEX_SESSION_ID", "codex_legacy"),
-        ("cursor", "CURSOR_SESSION_ID", "cursor_legacy"),
-        ("opencode", "OPENCODE_RUN_ID", "opencode_legacy"),
-        ("droid", "FACTORY_SESSION_ID", "droid_legacy"),
-        ("codebuddy", "CODEBUDDY_SESSION_ID", "codebuddy_legacy"),
-        ("pi", "PI_SESSION_ID", "pi_legacy"),
-        ("trae", "TRAE_SESSION_ID", "trae_legacy"),
+        ("dsh", "DSH_SESSION_ID", "dsh_legacy"),
+        ("claude", "CLAUDE_CODE_SESSION_ID", "claude_legacy"),
+        ("codex", "CODEX_THREAD_ID", "codex_legacy"),
+        ("gemini", "GEMINI_SESSION_ID", "gemini_legacy"),
+        ("qoder", "QODER_SESSION_ID", "qoder_legacy"),
+        ("kiro", "KIRO_SESSION_ID", "kiro_legacy"),
+        ("copilot", "COPILOT_SESSION_ID", "copilot_legacy"),
+        ("zcode", "CLAUDE_CODE_SESSION_ID", "claude_legacy"),
+        ("snow", "SNOW_SESSION_ID", "snow_legacy"),
     ],
 )
 def test_environment_adapter_contract(
@@ -95,8 +96,7 @@ def test_environment_adapter_contract(
 @pytest.mark.parametrize(
     ("platform", "env_name", "expected_prefix"),
     [
-        ("claude", "CLAUDE_TRANSCRIPT_PATH", "claude_transcript_"),
-        ("codex", "CODEX_TRANSCRIPT_PATH", "codex_transcript_"),
+        ("cursor", "CURSOR_TRANSCRIPT_PATH", "cursor_transcript_"),
     ],
 )
 def test_transcript_adapter_contract(
