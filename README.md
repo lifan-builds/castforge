@@ -11,7 +11,7 @@ CastForge powers [Nitan Podcast](https://github.com/lifan-builds/nitan-podcast),
 CastForge `0.1.3` adds schema-v2 editorial metadata, minimum-story no-episode gating, measured MP3 duration, a fail-closed NotebookLM short retry above a configured duration ceiling, and portable CA validation for public audio. Releases are published on [PyPI](https://pypi.org/project/castforge/) with trusted-publishing attestations:
 
 ```bash
-pip install castforge==0.1.1
+pip install castforge==0.1.3
 
 # Optional production integrations
 pip install "castforge[notebooklm,r2]==0.1.3"
