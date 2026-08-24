@@ -243,9 +243,3 @@ def publish_audio(
         )
 
     return anyio.run(_runner)
-
-
-# Backward-compatible aliases for the production Nitan show while it migrates
-# to the schedule-neutral names.
-publish_weekly_audio_async = publish_audio_async
-publish_weekly_audio = publish_audio

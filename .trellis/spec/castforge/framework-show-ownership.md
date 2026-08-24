@@ -24,13 +24,13 @@ The instance contract describes show-owned identity and public locations. For a 
 
 ### 1. Scope / Trigger
 
-- Applies to `publish_weekly_audio_async()` whenever CastForge uploads a source into a caller-owned NotebookLM notebook.
+- Applies to `publish_audio_async()` whenever CastForge uploads a source into a caller-owned NotebookLM notebook.
 
 ### 2. Signatures
 
 - Upload: `client.sources.add_file(notebook_id, markdown_path, wait=True, wait_timeout=...)`.
 - Cleanup: `client.sources.delete(notebook_id, source_id)`.
-- Public helper: `publish_weekly_audio_async(markdown_path, *, output_audio, ...) -> Path`.
+- Public helper: `publish_audio_async(markdown_path, *, output_audio, ...) -> Path`.
 
 ### 3. Contracts
 
