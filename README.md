@@ -11,7 +11,7 @@ CastForge powers [Nitan Podcast](https://github.com/lifan-builds/nitan-podcast),
 CastForge `0.1.3` adds schema-v2 editorial metadata, minimum-story no-episode gating, measured MP3 duration, a fail-closed NotebookLM short retry above a configured duration ceiling, and portable CA validation for public audio. Releases are published on [PyPI](https://pypi.org/project/castforge/) with trusted-publishing attestations:
 
 ```bash
-pip install castforge==0.1.1
+pip install castforge==0.1.3
 
 # Optional production integrations
 pip install "castforge[notebooklm,r2]==0.1.3"
@@ -40,13 +40,11 @@ Fixture mode does not call an LLM, audio service, or public endpoint. Replace th
 
 ```python
 from castforge import EpisodeManifest, SourceItem, StoryCluster
-from castforge.contracts import AudioProvider, Publisher, SourceAdapter
 ```
 
 - `SourceItem` normalizes one primary, independent, or trend-signal source.
 - `StoryCluster` groups duplicate coverage and qualifies only a primary source or two independent reports.
 - `EpisodeManifest` preserves the selected stories, citations, source document, pipeline version, and public audio identity.
-- `SourceAdapter`, `AudioProvider`, and `Publisher` are intentionally small protocols implemented by show repositories or integrations.
 
 The generic CLI consumes `podcast.yaml`; show-specific collectors and ranking remain in the show repository.
 
