@@ -24,11 +24,13 @@ class FakeSources:
     def __init__(self, calls) -> None:
         self.calls = calls
 
-    async def add_file(self, notebook_id, path, *, wait, wait_timeout):
+    async def add_file(self, _notebook_id, _path, *, wait, wait_timeout):
+        assert wait is True
+        assert wait_timeout > 0
         self.calls.append("add")
         return FakeResult()
 
-    async def delete(self, notebook_id, source_id):
+    async def delete(self, _notebook_id, _source_id):
         self.calls.append("delete")
 
 
@@ -47,7 +49,8 @@ class FakeArtifacts:
             raise RuntimeError("generation failed")
         return FakeFinal()
 
-    async def download_audio(self, notebook_id, output, *, artifact_id):
+    async def download_audio(self, _notebook_id, output, *, artifact_id):
+        assert artifact_id == "audio-1"
         self.calls.append("download")
         Path(output).write_bytes(b"audio")
 

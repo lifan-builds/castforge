@@ -16,8 +16,13 @@ def _mapping(raw: Any, name: str) -> dict[str, Any]:
     return raw
 
 
+def _opt_text(raw: dict[str, Any], key: str, default: str = "") -> str:
+    value = raw.get(key)
+    return str(value).strip() if value is not None and str(value).strip() else default
+
+
 def _text(raw: dict[str, Any], key: str, section: str) -> str:
-    value = str(raw.get(key, "") or "").strip()
+    value = _opt_text(raw, key)
     if not value:
         raise ValueError(f"{section}.{key} is required")
     return value
@@ -163,12 +168,12 @@ def load_config(path: Path) -> PodcastConfig:
     audio = AudioConfig(
         provider=_text(audio_raw, "provider", "audio"),
         output_dir=_resolve(base, audio_raw.get("output_dir"), "build/audio"),
-        duration=str(audio_raw.get("duration", "00:06:00")),
+        duration=_opt_text(audio_raw, "duration", "00:06:00"),
         public_url_template=_text(audio_raw, "public_url_template", "audio"),
         fixture_length_bytes=int(audio_raw.get("fixture_length_bytes", 0)),
-        language=str(audio_raw.get("language", show.language)),
-        instructions=str(audio_raw.get("instructions", "") or ""),
-        audio_length=str(audio_raw.get("audio_length", "default") or "default"),
+        language=_opt_text(audio_raw, "language", show.language),
+        instructions=_opt_text(audio_raw, "instructions"),
+        audio_length=_opt_text(audio_raw, "audio_length", "default"),
         max_duration_seconds=float(audio_raw.get("max_duration_seconds", 900.0)),
     )
     if audio.provider not in {"fixture", "notebooklm"}:
@@ -180,13 +185,13 @@ def load_config(path: Path) -> PodcastConfig:
 
     publication_raw = _mapping(root.get("publication", {"provider": "fixture"}), "publication")
     publication = PublicationConfig(
-        provider=str(publication_raw.get("provider", "fixture") or "fixture"),
-        bucket=str(publication_raw.get("bucket", "") or ""),
-        endpoint_url=str(publication_raw.get("endpoint_url", "") or ""),
-        public_base_url=str(publication_raw.get("public_base_url", "") or ""),
-        access_key_env=str(publication_raw.get("access_key_env", "R2_ACCESS_KEY_ID")),
-        secret_key_env=str(publication_raw.get("secret_key_env", "R2_SECRET_ACCESS_KEY")),
-        download_url_prefix=str(publication_raw.get("download_url_prefix", "") or ""),
+        provider=_opt_text(publication_raw, "provider", "fixture"),
+        bucket=_opt_text(publication_raw, "bucket"),
+        endpoint_url=_opt_text(publication_raw, "endpoint_url"),
+        public_base_url=_opt_text(publication_raw, "public_base_url"),
+        access_key_env=_opt_text(publication_raw, "access_key_env", "R2_ACCESS_KEY_ID"),
+        secret_key_env=_opt_text(publication_raw, "secret_key_env", "R2_SECRET_ACCESS_KEY"),
+        download_url_prefix=_opt_text(publication_raw, "download_url_prefix"),
         max_bucket_bytes=int(publication_raw.get("max_bucket_bytes", 0)),
     )
     if publication.provider not in {"fixture", "r2"}:

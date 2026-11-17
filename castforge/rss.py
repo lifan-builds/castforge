@@ -80,9 +80,10 @@ def write_episode(
         if old.findtext("guid") == manifest.episode_id:
             channel.remove(old)
 
+    description = _description(manifest)
     item = ET.Element("item")
     _sub(item, "title", manifest.title)
-    _sub(item, "description", _description(manifest))
+    _sub(item, "description", description)
     _sub(item, "guid", manifest.episode_id).set("isPermaLink", "false")
     published = datetime.combine(
         datetime.fromisoformat(manifest.episode_date).date(),
@@ -96,7 +97,7 @@ def write_episode(
         {"url": audio_url, "length": str(audio_length), "type": "audio/mpeg"},
     )
     _sub(item, f"{{{ITUNES_NS}}}duration", duration)
-    _sub(item, f"{{{ITUNES_NS}}}summary", _description(manifest))
+    _sub(item, f"{{{ITUNES_NS}}}summary", description)
     if manifest.transcript_url:
         ET.SubElement(
             item,

@@ -27,7 +27,6 @@ class NoEpisodeResult:
     status: str = "no-episode"
     episode_date: date = date.min
     reason: str = ""
-    ledger_path: Path | None = None
 
 
 def _slug(value: str) -> str:
@@ -78,7 +77,7 @@ def _recent_story_ids(config: PodcastConfig, episode_date: date) -> set[str]:
         try:
             manifest = EpisodeManifest.read(path)
             prior_date = date.fromisoformat(manifest.episode_date)
-        except (OSError, ValueError, json.JSONDecodeError):
+        except (OSError, ValueError):
             continue
         if cutoff <= prior_date < episode_date:
             covered.update(story.id for story in manifest.stories)
@@ -117,18 +116,20 @@ def _select_stories(config: PodcastConfig, clusters: list[StoryCluster], episode
 def render_source_document(show_title: str, episode_date: date, stories: tuple[StoryCluster, ...]) -> str:
     lines = [f"# {show_title} — {episode_date.isoformat()}", "", "Use only the cited facts below.", ""]
     for index, story in enumerate(stories, 1):
-        editorial = story.metadata.get("editorial")
-        if not isinstance(editorial, dict):
-            editorial = {}
-        actions = editorial.get("builder_actions") or story.metadata.get("builder_actions") or []
-        if isinstance(actions, (tuple, list)):
-            actions_text = ", ".join(str(action) for action in actions) or "not specified"
-        else:
-            actions_text = str(actions)
-        caveats = str(editorial.get("caveats") or story.metadata.get("caveats") or "Verify claims against the linked source; this document does not add facts beyond citations.")
-        why_now = str(editorial.get("why_now") or story.metadata.get("why_now") or story.selection_reason)
-        rationale = str(editorial.get("rationale") or story.selection_reason)
-        depth = str(editorial.get("depth_recommendation") or story.metadata.get("depth_recommendation") or "brief")
+        meta = {**story.metadata, **(story.metadata.get("editorial") or {})}
+        actions = meta.get("builder_actions") or ()
+        actions_text = (
+            ", ".join(str(action) for action in actions) or "not specified"
+            if isinstance(actions, (tuple, list))
+            else str(actions)
+        )
+        caveats = str(
+            meta.get("caveats")
+            or "Verify claims against the linked source; this document does not add facts beyond citations."
+        )
+        why_now = str(meta.get("why_now") or story.selection_reason)
+        rationale = str(meta.get("rationale") or story.selection_reason)
+        depth = str(meta.get("depth_recommendation") or "brief")
         lines.extend(
             [
                 f"## {index}. {story.title}",
@@ -220,8 +221,6 @@ def run_episode(config: PodcastConfig, episode_date: date, *, shadow: bool = Fal
             )
             audio_url = publisher.publish(audio_path, f"episodes/{filename}")
 
-    if config.audio.provider != "notebooklm":
-        duration = config.audio.duration
     manifest = replace(
         manifest,
         audio_url=audio_url,

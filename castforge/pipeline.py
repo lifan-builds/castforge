@@ -35,9 +35,9 @@ class PipelineHooks:
     week_episode_url: Callable[[int, int], str]
 
 
-def _week_filename(prefix: str, ext: str = ".md") -> str:
+def _week_filename(prefix: str) -> str:
     iso = date.today().isocalendar()
-    return f"{prefix}_{iso.year}-W{iso.week:02d}{ext}"
+    return f"{prefix}_{iso.year}-W{iso.week:02d}.md"
 
 
 def _default_audio_out(dated: bool, hooks: PipelineHooks) -> Path:
@@ -117,14 +117,13 @@ def main(argv: list[str] | None, *, hooks: PipelineHooks) -> int:
 
     if args.list_mcp_tools:
         try:
-            tools = hooks.list_mcp_tools()
             out = [
                 {
                     "name": t.name,
                     "description": getattr(t, "description", None),
                     "inputSchema": getattr(t, "inputSchema", None),
                 }
-                for t in tools
+                for t in hooks.list_mcp_tools()
             ]
             json.dump(out, sys.stdout, ensure_ascii=False, indent=2)
             sys.stdout.write("\n")
@@ -133,13 +132,9 @@ def main(argv: list[str] | None, *, hooks: PipelineHooks) -> int:
             log.exception("Failed to list MCP tools")
             return 1
 
-    export_dir = args.export_dir if args.export_dir is not None else DEFAULT_EXPORT_DIR
-    if args.output_filename:
-        filename = args.output_filename
-    elif args.dated:
-        filename = _week_filename(hooks.episode_file_prefix)
-    else:
-        filename = DEFAULT_MARKDOWN_NAME
+    filename = args.output_filename or (
+        _week_filename(hooks.episode_file_prefix) if args.dated else DEFAULT_MARKDOWN_NAME
+    )
 
     try:
         if args.markdown_input:
@@ -147,7 +142,6 @@ def main(argv: list[str] | None, *, hooks: PipelineHooks) -> int:
             if not md_input.is_file():
                 log.error("Markdown input not found: %s", md_input)
                 return 1
-            body = md_input.read_text(encoding="utf-8")
             path = md_input
             threads = None
             log.info("Using existing Markdown: %s", path)
@@ -166,24 +160,17 @@ def main(argv: list[str] | None, *, hooks: PipelineHooks) -> int:
                 threads = hooks.fetch_thread_details(threads)
 
             raw_md = hooks.threads_to_source_markdown(threads)
-
-            if args.skip_briefing:
-                body = raw_md
-                log.info("Skipping Gemini briefing")
-            else:
-                body = write_briefing_markdown(raw_md)
-
-            path = export_for_notebooklm(body, export_dir=export_dir, filename=filename)
+            body = raw_md if args.skip_briefing else write_briefing_markdown(raw_md)
+            path = export_for_notebooklm(body, export_dir=args.export_dir, filename=filename)
             log.info("Wrote NotebookLM source: %s", path)
 
         audio_path = None
-
         if args.publish_notebooklm:
-            audio_path = args.notebooklm_audio_out
-            if audio_path is None:
-                audio_path = _default_audio_out(args.dated, hooks)
-            else:
-                audio_path = audio_path.resolve()
+            audio_path = (
+                args.notebooklm_audio_out.resolve()
+                if args.notebooklm_audio_out
+                else _default_audio_out(args.dated, hooks)
+            )
             log.info("Publishing to NotebookLM; audio output: %s", audio_path)
             publish_audio(path, audio_path)
             log.info("Downloaded Audio Overview: %s", audio_path)
@@ -202,25 +189,19 @@ def main(argv: list[str] | None, *, hooks: PipelineHooks) -> int:
             log.info("Wrote forum post: %s", post_path)
 
         if args.generate_rss:
-            rss_audio_url = args.audio_url
-            if not rss_audio_url:
-                iso = date.today().isocalendar()
-                rss_audio_url = hooks.week_episode_url(iso.year, iso.week)
-            rss_mp3 = args.mp3_path or audio_path
+            iso = date.today().isocalendar()
+            rss_audio_url = args.audio_url or hooks.week_episode_url(iso.year, iso.week)
             feed_path = hooks.generate_rss_feed(
                 path,
                 args.rss_output,
                 audio_url=rss_audio_url,
                 duration=args.episode_duration,
                 threads=threads,
-                mp3_path=rss_mp3,
+                mp3_path=args.mp3_path or audio_path,
             )
             log.info("Updated RSS feed: %s", feed_path)
 
-        if audio_path and audio_path.is_file():
-            print(str(audio_path), file=sys.stdout)
-        else:
-            print(str(path), file=sys.stdout)
+        print(str(audio_path if audio_path and audio_path.is_file() else path), file=sys.stdout)
         return 0
     except Exception:
         log.exception("Pipeline failed")

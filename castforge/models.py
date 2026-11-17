@@ -12,6 +12,11 @@ SourceAuthority = Literal["primary", "independent", "analysis", "signal"]
 StoryKind = Literal["development", "expert_analysis"]
 
 
+def _opt_text(raw: dict[str, Any], key: str, default: str = "") -> str:
+    value = raw.get(key)
+    return str(value) if value is not None else default
+
+
 def _required_text(value: Any, field_name: str) -> str:
     text = str(value or "").strip()
     if not text:
@@ -54,8 +59,8 @@ class SourceItem:
             published_at=raw.get("published_at", ""),
             summary=raw.get("summary", ""),
             authority=raw.get("authority", "signal"),
-            organization=str(raw.get("organization", "") or ""),
-            category=str(raw.get("category", "") or ""),
+            organization=_opt_text(raw, "organization"),
+            category=_opt_text(raw, "category"),
             metadata=dict(raw.get("metadata") or {}),
         )
 
@@ -91,11 +96,11 @@ class StoryCluster:
             id=raw.get("id", ""),
             title=raw.get("title", ""),
             summary=raw.get("summary", ""),
-            category=str(raw.get("category", "") or ""),
-            organization=str(raw.get("organization", "") or ""),
+            category=_opt_text(raw, "category"),
+            organization=_opt_text(raw, "organization"),
             sources=tuple(SourceItem.from_dict(item) for item in raw.get("sources", [])),
             selection_reason=raw.get("selection_reason", ""),
-            kind=str(raw.get("kind", "development") or "development"),
+            kind=_opt_text(raw, "kind") or "development",
             metadata=dict(raw.get("metadata") or {}),
         )
 
@@ -108,9 +113,7 @@ class StoryCluster:
         if any(item.authority == "primary" for item in self.sources):
             return True
         independent = {item.source.casefold() for item in self.sources if item.authority == "independent"}
-        if len(independent) >= 2:
-            return True
-        return False
+        return len(independent) >= 2
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -174,11 +177,11 @@ class EpisodeManifest:
             stories=tuple(StoryCluster.from_dict(story) for story in raw.get("stories", [])),
             source_document=raw.get("source_document", ""),
             pipeline_version=raw.get("pipeline_version", ""),
-            audio_url=str(raw.get("audio_url", "") or ""),
-            duration=str(raw.get("duration", "") or ""),
+            audio_url=_opt_text(raw, "audio_url"),
+            duration=_opt_text(raw, "duration"),
             metadata=dict(raw.get("metadata") or {}),
-            transcript_url=str(raw.get("transcript_url", "") or ""),
-            chapters_url=str(raw.get("chapters_url", "") or ""),
+            transcript_url=_opt_text(raw, "transcript_url"),
+            chapters_url=_opt_text(raw, "chapters_url"),
             schema_version=int(raw.get("schema_version", 1)),
         )
 

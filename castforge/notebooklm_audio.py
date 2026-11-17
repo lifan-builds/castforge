@@ -53,35 +53,15 @@ def _ensure_notebooklm_imported() -> Any:
         ) from e
 
 
-def _parse_audio_format(name: str | None, AudioFormat: Any) -> Any:
-    if not name or not str(name).strip():
+def _parse_audio_option(name: str | None, enum: Any, option: str) -> Any:
+    if not name or not name.strip():
         return None
-    key = str(name).strip().lower().replace("-", "_")
-    mapping = {
-        "deep_dive": AudioFormat.DEEP_DIVE,
-        "brief": AudioFormat.BRIEF,
-        "critique": AudioFormat.CRITIQUE,
-        "debate": AudioFormat.DEBATE,
-    }
+    key = name.strip().lower().replace("-", "_")
+    names = ("deep_dive", "brief", "critique", "debate") if option == "FORMAT" else ("short", "default", "long")
+    mapping = {item: getattr(enum, item.upper()) for item in names}
     if key not in mapping:
         raise ValueError(
-            f"NOTEBOOKLM_AUDIO_FORMAT must be one of {list(mapping.keys())}, got {name!r}"
-        )
-    return mapping[key]
-
-
-def _parse_audio_length(name: str | None, AudioLength: Any) -> Any:
-    if not name or not str(name).strip():
-        return None
-    key = str(name).strip().lower()
-    mapping = {
-        "short": AudioLength.SHORT,
-        "default": AudioLength.DEFAULT,
-        "long": AudioLength.LONG,
-    }
-    if key not in mapping:
-        raise ValueError(
-            f"NOTEBOOKLM_AUDIO_LENGTH must be one of {list(mapping.keys())}, got {name!r}"
+            f"NOTEBOOKLM_AUDIO_{option} must be one of {list(mapping)}, got {name!r}"
         )
     return mapping[key]
 
@@ -146,10 +126,10 @@ async def publish_audio_async(
     af = audio_format
     al = audio_length
     if af is None and cfg["audio_format_name"]:
-        af = _parse_audio_format(cfg["audio_format_name"], AudioFormat)
+        af = _parse_audio_option(cfg["audio_format_name"], AudioFormat, "FORMAT")
     configured_length = audio_length_name or cfg["audio_length_name"]
     if al is None and configured_length:
-        al = _parse_audio_length(configured_length, AudioLength)
+        al = _parse_audio_option(configured_length, AudioLength, "LENGTH")
 
     md = Path(markdown_path).resolve()
     if not md.is_file():
@@ -201,7 +181,7 @@ async def publish_audio_async(
             if max_duration_seconds is not None:
                 measured = probe_audio_duration(out)
                 if measured > max_duration_seconds:
-                    short = _parse_audio_length("short", AudioLength)
+                    short = _parse_audio_option("short", AudioLength, "LENGTH")
                     if al != short:
                         logger.warning(
                             "NotebookLM audio measured %.2fs (> %.2fs); retrying once at short length",
@@ -236,16 +216,9 @@ def publish_audio(
     **kwargs: Any,
 ) -> Path:
     """Sync wrapper for jobs and CLI."""
-
-    async def _runner() -> Path:
-        return await publish_audio_async(
-            markdown_path, output_audio=output_audio, **kwargs
-        )
-
-    return anyio.run(_runner)
+    return anyio.run(
+        lambda: publish_audio_async(markdown_path, output_audio=output_audio, **kwargs)
+    )
 
 
-# Backward-compatible aliases for the production Nitan show while it migrates
-# to the schedule-neutral names.
-publish_weekly_audio_async = publish_audio_async
-publish_weekly_audio = publish_audio
+__all__ = ["publish_audio", "publish_audio_async"]

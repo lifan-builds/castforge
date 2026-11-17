@@ -9,7 +9,7 @@ from datetime import date
 from pathlib import Path
 
 from castforge.config import load_config
-from castforge.runner import run_episode
+from castforge.runner import NoEpisodeResult, run_episode
 from castforge.scaffold import initialize_show
 from castforge.validation import validate_project
 
@@ -42,22 +42,23 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         config = load_config(args.config)
         if args.command == "run":
-            manifest = run_episode(config, args.episode_date, shadow=args.shadow)
-            print(config.outputs.manifests / f"{manifest.episode_date}.json")
+            result = run_episode(config, args.episode_date, shadow=args.shadow)
+            if isinstance(result, NoEpisodeResult):
+                print(result.status)
+            else:
+                print(config.outputs.manifests / f"{result.episode_date}.json")
             return 0
-        if args.command == "validate":
-            errors = validate_project(
-                config,
-                episode_date=args.episode_date,
-                check_public=args.check_public,
-            )
-            if errors:
-                for error in errors:
-                    print(f"ERROR: {error}", file=sys.stderr)
-                return 1
-            print("CastForge validation passed")
-            return 0
+        errors = validate_project(
+            config,
+            episode_date=args.episode_date,
+            check_public=args.check_public,
+        )
+        if errors:
+            for error in errors:
+                print(f"ERROR: {error}", file=sys.stderr)
+            return 1
+        print("CastForge validation passed")
+        return 0
     except Exception as error:
         logging.getLogger("castforge").error("%s", error)
         return 1
-    raise AssertionError(f"unhandled command: {args.command}")
