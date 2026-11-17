@@ -4,7 +4,10 @@ Open-source Python framework for repeatable, source-transparent podcast pipeline
 
 CastForge separates reusable production mechanics from show-owned editorial policy. It can normalize cited sources, record an auditable episode manifest, generate NotebookLM audio, publish MP3s to Cloudflare R2, update RSS atomically, and validate the result. Each show keeps its own sources, prompts, identity, schedule, and feed.
 
-CastForge powers [Nitan Podcast](https://github.com/lifan-builds/nitan-podcast), a production Chinese podcast generated from USCardForum discussions.
+CastForge powers [Nitan Podcast](https://github.com/lifan-builds/nitan-podcast) ([clifan.com/nitan-podcast](https://clifan.com/nitan-podcast/)) and [AI Builder Brief](https://clifan.com/ai-builder-brief/).
+
+- **Overview & Pipeline Architecture:** [https://clifan.com/castforge/](https://clifan.com/castforge/)
+- **PyPI Package:** [`castforge`](https://pypi.org/project/castforge/)
 
 ## Install
 
