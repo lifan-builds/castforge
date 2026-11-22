@@ -3,8 +3,8 @@ name = "castforge"
 version = "0.1.3"
 description = "Open-source framework for automated podcast pipelines"
 readme = "README.md"
-license = "MIT"
-authors = [{ name = "CastForge contributors" }]
+license = { file = "LICENSE" }
+authors = [{ name = "lifan-builds" }]
 requires-python = ">=3.10"
 keywords = ["podcast", "automation", "notebooklm", "rss", "gemini"]
 classifiers = [
