@@ -6,7 +6,7 @@ import json
 import re
 from collections import defaultdict
 from dataclasses import dataclass, replace
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -170,7 +170,7 @@ def run_episode(config: PodcastConfig, episode_date: date, *, shadow: bool = Fal
         episode_date.day,
         config.show.publication_hour,
         tzinfo=ZoneInfo(config.show.timezone),
-    ).astimezone(UTC).isoformat().replace("+00:00", "Z")
+    ).astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
     manifest_path = config.outputs.manifests / f"{episode_date.isoformat()}.json"
     try:
         source_document = source_path.relative_to(config.path.parent).as_posix()

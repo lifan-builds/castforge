@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
-from datetime import UTC, datetime, time
+from datetime import datetime, time, timezone
 from email.utils import format_datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -89,7 +89,7 @@ def write_episode(
         datetime.fromisoformat(manifest.episode_date).date(),
         time(hour=show.publication_hour),
         tzinfo=ZoneInfo(show.timezone),
-    ).astimezone(UTC)
+    ).astimezone(timezone.utc)
     _sub(item, "pubDate", format_datetime(published, usegmt=True))
     ET.SubElement(
         item,
