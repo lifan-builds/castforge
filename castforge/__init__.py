@@ -6,5 +6,5 @@ from castforge.models import EpisodeManifest, SourceItem, StoryCluster
 
 __all__ = ["ATTRIBUTION", "EpisodeManifest", "SourceItem", "StoryCluster", "__version__"]
 
-__version__ = "0.1.3"
+__version__ = "0.1.4"
 ATTRIBUTION = "Based on CastForge by lifan-builds (https://github.com/lifan-builds/castforge)"
