@@ -5,3 +5,16 @@ __pycache__/
 dist/
 build/
 *.egg-info/
+
+# lifan-builds maintainer-only (local; backed up by agent/scripts/harness-sync.py snapshot)
+/RESEARCH.md
+/PRODUCT.md
+/DESIGN.md
+/PLAN.md
+/PLANS.md
+/STORE.md
+/CONTEXT.md
+/NOW.md
+/PERF_REVIEW_PLAYBOOK.md
+/.impeccable/
+# end lifan-builds maintainer-only
