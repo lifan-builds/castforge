@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 lifan-builds. CastForge; Section 7 attribution terms in ATTRIBUTION.md.
 """Command-line interface for config-driven CastForge shows."""
 
 from __future__ import annotations
@@ -8,6 +10,7 @@ import sys
 from datetime import date
 from pathlib import Path
 
+from castforge import ATTRIBUTION, __version__
 from castforge.config import load_config
 from castforge.runner import NoEpisodeResult, run_episode
 from castforge.scaffold import initialize_show
@@ -15,7 +18,16 @@ from castforge.validation import validate_project
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="castforge", description="Build source-transparent podcast pipelines")
+    parser = argparse.ArgumentParser(
+        prog="castforge",
+        description="Build source-transparent podcast pipelines",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"castforge {__version__}\n{ATTRIBUTION}\nLicense: AGPL-3.0-only with Section 7 attribution terms (ATTRIBUTION.md)",
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     init_parser = subparsers.add_parser("init", help="create a minimal show repository")

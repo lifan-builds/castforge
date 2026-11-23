@@ -3,7 +3,8 @@ name = "castforge"
 version = "0.1.3"
 description = "Open-source framework for automated podcast pipelines"
 readme = "README.md"
-license = { file = "LICENSE" }
+license = "AGPL-3.0-only"
+license-files = ["LICENSE", "ATTRIBUTION.md"]
 authors = [{ name = "lifan-builds" }]
 requires-python = ">=3.10"
 keywords = ["podcast", "automation", "notebooklm", "rss", "gemini"]
@@ -47,7 +48,7 @@ Documentation = "https://github.com/lifan-builds/castforge#readme"
 Issues = "https://github.com/lifan-builds/castforge/issues"
 
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
