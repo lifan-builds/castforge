@@ -1,28 +1,51 @@
 # CastForge
 
-Open-source Python framework for repeatable, source-transparent podcast pipelines.
+[![PyPI](https://img.shields.io/pypi/v/castforge.svg)](https://pypi.org/project/castforge/)
+[![Python 3.10+](https://img.shields.io/pypi/pyversions/castforge.svg)](https://pypi.org/project/castforge/)
+[![License: AGPL-3.0-only](https://img.shields.io/badge/License-AGPL--3.0--only-blue.svg)](https://github.com/lifan-builds/castforge/blob/main/LICENSE)
+[![Demo & Audio](https://img.shields.io/badge/demo-clifan.com%2Fcastforge-0f766e.svg)](https://clifan.com/castforge/)
 
-CastForge separates reusable production mechanics from show-owned editorial policy. It can normalize cited sources, record an auditable episode manifest, generate NotebookLM audio, publish MP3s to Cloudflare R2, update RSS atomically, and validate the result. Each show keeps its own sources, prompts, identity, schedule, and feed.
+Fail-closed Python framework for repeatable, source-transparent podcast pipelines.
 
-CastForge powers [Nitan Podcast](https://github.com/lifan-builds/nitan-podcast) ([clifan.com/nitan-podcast](https://clifan.com/nitan-podcast/)) and [AI Builder Brief](https://clifan.com/ai-builder-brief/).
+CastForge separates reusable production mechanics from show-owned editorial policy. It gates cited sources into an auditable schema-v2 `EpisodeManifest`, generates NotebookLM audio with measured duration ceilings, uploads MP3s to Cloudflare R2 with bucket-cap and public `HEAD` verification, and updates RSS atomically by date-keyed GUID. Each show keeps its own collectors, prompts, identity, schedule, and feed.
 
-- **Overview & Pipeline Architecture:** [https://clifan.com/castforge/](https://clifan.com/castforge/)
-- **PyPI Package:** [`castforge`](https://pypi.org/project/castforge/)
+```text
+sources.json ──▶ StoryCluster Gate ──▶ Cited Markdown + EpisodeManifest (v2)
+                  (primary or 2x          │
+                   independent;           ├── --shadow stops here
+                   min_stories check)     ▼
+                                    NotebookLM Audio (MP3 duration probe + short retry)
+                                          ▼
+                                    Cloudflare R2 Upload (max_bucket_bytes + public HEAD)
+                                          ▼
+                                    Atomic RSS Upsert (date-keyed GUID; unchanged on failure)
+```
+
+## Live demos & audio
+
+| Surface | What to inspect | Links |
+| --- | --- | --- |
+| **Interactive Workbench & Sample Audio** | 4-stage gate walkthrough and synthesized MP3 sample | [clifan.com/castforge](https://clifan.com/castforge/) · [sample-briefing.mp3](https://clifan.com/castforge/assets/sample-briefing.mp3) |
+| **Nitan Podcast** | Production weekly show (28 published episodes) | [Show page](https://clifan.com/nitan-podcast/) · [GitHub](https://github.com/lifan-builds/nitan-podcast) · [RSS feed](https://lifan-builds.github.io/nitan-podcast/feed.xml) |
+| **AI Builder Brief** | Evidence-gated daily builder show | [Show page](https://clifan.com/ai-builder-brief/) · [RSS feed](https://clifan.com/journal/ai-builder-brief/feed.xml) |
 
 ## Install
 
-CastForge `0.1.4` is the first `AGPL-3.0-only` release. `0.1.3` added schema-v2 editorial metadata, minimum-story no-episode gating, measured MP3 duration, a fail-closed NotebookLM short retry above a configured duration ceiling, and portable CA validation for public audio. Releases are published on [PyPI](https://pypi.org/project/castforge/) with trusted-publishing attestations:
-
 ```bash
-pip install castforge==0.1.4
-
-# Optional production integrations
-pip install "castforge[notebooklm,r2]==0.1.4"
+pip install castforge
 ```
 
-Python 3.10 or newer is supported. Gemini, NotebookLM, and R2 dependencies remain optional.
+With optional NotebookLM and Cloudflare R2 production integrations:
 
-## First episode in under 20 minutes
+```bash
+pip install "castforge[notebooklm,r2]"
+```
+
+Requires Python 3.10+. Core validation and offline runs need zero optional extras (`google-genai`, `notebooklm-py`, and `boto3` are imported lazily). Releases are published on [PyPI](https://pypi.org/project/castforge/) with trusted-publishing attestations (`0.1.4` is the first `AGPL-3.0-only` release).
+
+## 30-second offline quickstart
+
+Scaffold a fixture-backed show, generate an episode, and validate its manifest and RSS contract locally with no API keys or network calls:
 
 ```bash
 mkdir my-show && cd my-show
@@ -31,13 +54,29 @@ castforge run --config podcast.yaml --date 2026-08-11
 castforge validate --config podcast.yaml --date 2026-08-11
 ```
 
-The fixture-backed starter creates:
+Expected output:
 
-- a cited NotebookLM source document;
-- a deterministic episode manifest;
-- an RSS feed with a positive audio enclosure contract.
+```text
+.../my-show/podcast.yaml
+.../my-show/fixtures/sources.json
+.../my-show/build/manifests/2026-08-11.json
+CastForge validation passed
+```
 
-Fixture mode does not call an LLM, audio service, or public endpoint. Replace the example sources and public values before production use.
+The starter produces three deterministic artifacts under `build/`:
+
+- `build/sources/2026-08-11.md` — cited NotebookLM source document (`What happened`, `Why now`, `Caveats / Unknowns`, and linked sources);
+- `build/manifests/2026-08-11.json` — schema-v2 `EpisodeManifest` preserving selected stories, citations, pipeline version, and audio metadata;
+- `build/feed.xml` — valid podcast RSS with a positive-length `audio/mpeg` enclosure and date-keyed GUID.
+
+Replace the fixture sources and example URLs in `podcast.yaml` before production use.
+
+## Fail-closed guarantees
+
+- **Evidence-gated selection (`StoryCluster`):** A story qualifies only with a `primary` source, at least two distinct `independent` sources, or `expert_analysis` backed by an `analysis` source. Uncorroborated `signal` items are excluded.
+- **Diversity & no-episode gating:** `max_per_organization`, `max_per_category`, and `recent_days` prevent repetition across episodes; falling below `min_stories` exits cleanly with `no-episode` instead of publishing filler.
+- **Duration ceiling & retry:** Measures generated MP3 length, retries once at NotebookLM `short` length if it exceeds `max_duration_seconds`, and fails closed if still over ceiling.
+- **Capacity-checked R2 + atomic RSS:** Paginates the bucket to enforce `max_bucket_bytes` (subtracting overwritten object sizes), uploads as `audio/mpeg`, verifies the public URL via `HEAD` (status, MIME type, exact byte length, portable `certifi` CAs), and only then atomically replaces the RSS file. Any failed stage leaves the existing feed unchanged.
 
 ## Core contracts
 
@@ -45,11 +84,11 @@ Fixture mode does not call an LLM, audio service, or public endpoint. Replace th
 from castforge import EpisodeManifest, SourceItem, StoryCluster
 ```
 
-- `SourceItem` normalizes one primary, independent, or trend-signal source.
-- `StoryCluster` groups duplicate coverage and qualifies only a primary source or two independent reports.
-- `EpisodeManifest` preserves the selected stories, citations, source document, pipeline version, and public audio identity.
+- `SourceItem` normalizes one `primary`, `independent`, `analysis`, or `signal` source with ISO 8601 `published_at`.
+- `StoryCluster` deduplicates related coverage and enforces source qualification.
+- `EpisodeManifest` records the selected stories, citations, source document path, pipeline version, and public audio identity.
 
-The generic CLI consumes `podcast.yaml`; show-specific collectors and ranking remain in the show repository.
+The generic CLI consumes `podcast.yaml` (see [Show Configuration Contract](https://github.com/lifan-builds/castforge/blob/main/docs/instance-contract.md)); show-specific collectors and ranking stay in the show repository.
 
 ## Commands
 
@@ -59,13 +98,13 @@ castforge run --config podcast.yaml --date YYYY-MM-DD [--shadow]
 castforge validate --config podcast.yaml [--date YYYY-MM-DD] [--check-public]
 ```
 
-`--shadow` creates the source and manifest artifacts but does not mutate RSS or R2. Same-date production reruns replace the date-keyed RSS item instead of duplicating it.
+`--shadow` generates the source document and manifest without mutating RSS or R2. Same-date production reruns upsert the date-keyed RSS item by GUID instead of duplicating it.
 
 ## Production configuration
 
-See [`examples/podcast.yaml`](examples/podcast.yaml) for the complete schema.
+See [`examples/podcast.yaml`](https://github.com/lifan-builds/castforge/blob/main/examples/podcast.yaml) for the complete schema.
 
-For NotebookLM:
+### NotebookLM audio
 
 ```yaml
 audio:
@@ -75,9 +114,10 @@ audio:
   public_url_template: https://audio.example.com/episodes/{filename}
   language: en
   audio_length: short
+  max_duration_seconds: 900
 ```
 
-Install and authenticate the integration once on the runner:
+Install and authenticate once on the runner:
 
 ```bash
 pip install "castforge[notebooklm]"
@@ -87,7 +127,7 @@ notebooklm login
 
 Set `NOTEBOOKLM_NOTEBOOK_ID`. Authentication state and notebook ownership stay outside the show repository.
 
-For Cloudflare R2:
+### Cloudflare R2 publication
 
 ```yaml
 publication:
@@ -101,11 +141,11 @@ publication:
   max_bucket_bytes: 9000000000
 ```
 
-CastForge totals the bucket before each upload and refuses a projected size above `max_bucket_bytes`; overwrites subtract the prior object and listings paginate safely. It then uploads MP3s as `audio/mpeg` and sends a public `HEAD` request to verify status, MIME type, and byte length before updating RSS. A show may apply a privacy-respecting download redirect such as OP3 after the R2 origin passes validation. A failed capacity check, generation, upload, or public check leaves the feed unchanged.
+Optional privacy-respecting download redirects such as OP3 are applied only after the R2 origin passes public `HEAD` validation.
 
 ## Existing hook pipeline
 
-Production shows can continue wiring show-specific extraction and publishing through `PipelineHooks` while migrating to config-driven artifacts:
+Shows migrating to config-driven artifacts can wire show-specific extraction and publishing through `PipelineHooks`:
 
 ```python
 from castforge.pipeline import PipelineHooks, main as castforge_main
@@ -136,7 +176,7 @@ python -m pytest
 python -m build
 ```
 
-Tests are offline and use fake provider clients. Live NotebookLM and R2 checks require explicit credentials and are not part of the ordinary suite.
+Tests run offline against fake provider clients. Live NotebookLM and R2 checks require explicit credentials and are outside the default suite.
 
 ## License
 
