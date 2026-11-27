@@ -94,9 +94,11 @@ The generic CLI consumes `podcast.yaml` (see [Show Configuration Contract](https
 
 ```bash
 castforge init [directory]
-castforge run --config podcast.yaml --date YYYY-MM-DD [--shadow]
-castforge validate --config podcast.yaml [--date YYYY-MM-DD] [--check-public]
+castforge run [--config CONFIG] [--date YYYY-MM-DD] [--shadow]
+castforge validate [--config CONFIG] [--date YYYY-MM-DD] [--check-public]
 ```
+
+Both commands default to `podcast.yaml` in the current directory. When `--date` is omitted, `run` uses today's local date and `validate` checks all episode manifests.
 
 `--shadow` generates the source document and manifest without mutating RSS or R2. Same-date production reruns upsert the date-keyed RSS item by GUID instead of duplicating it.
 

@@ -41,7 +41,10 @@ def build_parser() -> argparse.ArgumentParser:
     validate_parser = subparsers.add_parser("validate", help="validate manifests, RSS, and optional public audio")
     validate_parser.add_argument("--config", type=Path, default=Path("podcast.yaml"))
     validate_parser.add_argument("--date", dest="episode_date", default=None)
-    validate_parser.add_argument("--check-public", action="store_true")
+    validate_parser.add_argument(
+        "--check-public", action="store_true",
+        help="make network requests to check RSS enclosure URLs (default: local validation only)",
+    )
     return parser
 
 

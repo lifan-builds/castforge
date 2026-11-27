@@ -19,6 +19,7 @@ source:
   fixture: sources.json
 
 selection:
+  min_stories: 1
   max_stories: 5
   max_per_organization: 1
   max_per_category: 1
@@ -28,6 +29,7 @@ audio:
   provider: fixture
   output_dir: build/audio
   duration: 00:06:00
+  max_duration_seconds: 900
   public_url_template: https://example.com/podcast/episodes/{filename}
   fixture_length_bytes: 1024
   language: en
@@ -35,6 +37,7 @@ audio:
 
 publication:
   provider: fixture
+  max_bucket_bytes: 0
 
 outputs:
   root: build
