@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
+from datetime import date
 from pathlib import Path
 
 from castforge.config import PodcastConfig
@@ -14,11 +15,16 @@ from castforge.publishers.r2 import validate_public_audio
 
 def validate_project(config: PodcastConfig, *, episode_date: str | None = None, check_public: bool = False) -> list[str]:
     errors: list[str] = []
-    manifests = (
-        [config.outputs.manifests / f"{episode_date}.json"]
-        if episode_date
-        else sorted(config.outputs.manifests.glob("*.json"))
-    )
+    if episode_date is None:
+        manifests = sorted(config.outputs.manifests.glob("*.json"))
+    else:
+        try:
+            canonical = date.fromisoformat(episode_date).isoformat() == episode_date
+        except ValueError:
+            canonical = False
+        if not canonical:
+            return ["episode_date must be a valid YYYY-MM-DD date"]
+        manifests = [config.outputs.manifests / f"{episode_date}.json"]
     if not manifests:
         errors.append("no episode manifests found")
     for path in manifests:
@@ -30,8 +36,11 @@ def validate_project(config: PodcastConfig, *, episode_date: str | None = None, 
         source_path = Path(manifest.source_document)
         if not source_path.is_absolute():
             source_path = config.path.parent / source_path
-        if not source_path.is_file() or not source_path.read_text(encoding="utf-8").strip():
-            errors.append(f"missing source document for {manifest.episode_id}: {source_path}")
+        try:
+            if not source_path.is_file() or not source_path.read_text(encoding="utf-8").strip():
+                errors.append(f"missing source document for {manifest.episode_id}: {source_path}")
+        except (OSError, UnicodeDecodeError) as error:
+            errors.append(f"unreadable source document for {manifest.episode_id}: {source_path}: {error}")
 
     if not config.outputs.feed.is_file():
         errors.append(f"feed not found: {config.outputs.feed}")
@@ -51,7 +60,9 @@ def validate_project(config: PodcastConfig, *, episode_date: str | None = None, 
         if enclosure is None:
             errors.append(f"missing enclosure for {guid}")
             continue
-        url = enclosure.get("url", "")
+        url = enclosure.get("url", "").strip()
+        if not url:
+            errors.append(f"missing enclosure URL for {guid}")
         try:
             length = int(enclosure.get("length", "0"))
         except ValueError:

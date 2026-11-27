@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -114,7 +115,8 @@ def load_config(path: Path) -> PodcastConfig:
     config_path = Path(path).resolve()
     raw = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     root = _mapping(raw, "config")
-    if int(root.get("version", 0)) not in {1, 2}:
+    version = root.get("version")
+    if type(version) not in (int, str) or version not in (1, 2, "1", "2"):
         raise ValueError("version must be 1 or 2")
 
     base = config_path.parent
@@ -182,8 +184,8 @@ def load_config(path: Path) -> PodcastConfig:
         raise ValueError("audio.provider must be fixture or notebooklm")
     if audio.provider == "fixture" and audio.fixture_length_bytes < 1:
         raise ValueError("audio.fixture_length_bytes must be positive for fixture audio")
-    if audio.max_duration_seconds <= 0:
-        raise ValueError("audio.max_duration_seconds must be positive")
+    if not math.isfinite(audio.max_duration_seconds) or audio.max_duration_seconds <= 0:
+        raise ValueError("audio.max_duration_seconds must be positive and finite")
 
     publication_raw = _mapping(root.get("publication", {"provider": "fixture"}), "publication")
     publication = PublicationConfig(
